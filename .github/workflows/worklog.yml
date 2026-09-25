@@ -1,0 +1,91 @@
+# 每日更新工作日志（GitHub Actions 版，可选）
+#
+# 场景：本机不常开机，希望由 GitHub 每天自动采一次、重新渲染并发布。
+# 放置位置：站点仓库（部署 Cloudflare Pages 的项目 www-32321 对应的仓库）的 .github/workflows/worklog-daily.yml
+#
+# 需要准备：
+#   1) 站点仓库里放好采集/生成脚本：_collect.py、_gen_worklog.py、inter-var.woff2
+#      （两个脚本的数据与字体路径都取脚本同目录，输出可用环境变量覆盖）
+#   2) 站点仓库根目录要有 index.html（生成脚本把它当模板），产物写回 worklog.html
+#   3) Secrets：SRC_TOKEN（只读两个源仓库的 token）、WORKLOG_API（Worker 地址）、
+#      WORKLOG_PUBLISH_TOKEN（Worker 的发布口令，用来把页面推给 Worker）
+#   4) cron 用 UTC：13:30 UTC = 北京时间 21:30
+name: worklog-daily
+
+on:
+  schedule:
+    - cron: '30 13 * * *'
+  workflow_dispatch:                     # 手动跑一次
+  repository_dispatch:                   # Worker 发现数据有变化时会发这个事件
+    types: [worklog-refresh]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取出站点仓库
+        uses: actions/checkout@v4
+
+      - name: 拉取两个源仓库的提交图（不拉文件内容，很快）
+        run: |
+          git clone --bare --filter=blob:none \
+            https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/DelicateDuck582/cloud-mail.git cloud-mail.git
+          git clone --bare --filter=blob:none \
+            https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/DelicateDuck582/SPlayer.git SPlayer.git
+
+      - name: 取回 AI 类型判定（可选：没配 API/TOKEN 就跳过）
+        env:
+          API: ${{ secrets.WORKLOG_API }}
+          TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$API" ] || [ -z "$TOKEN" ]; then
+            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过（类型仍按前缀 + 关键词那套规则）'
+            exit 0
+          fi
+          # 类型判定由 Worker 那边增量维护（cron 每天补几批，本地 _daily_update.ps1 也会补），这里只取现成的
+          curl -fsS "$API/classify.json" -o worklog-kinds.json || true
+
+      - name: 采集 + 生成
+        env:
+          WORKLOG_API: ${{ secrets.WORKLOG_API }}
+        run: |
+          python _collect.py
+          python _gen_worklog.py
+
+      - name: 采集 + 生成
+        env:
+          WORKLOG_API: ${{ secrets.WORKLOG_API }}
+        run: |
+          python _collect.py
+          python _gen_worklog.py
+
+      - name: 有变化就提交回仓库（Pages 会自动发布）
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worklog.html
+          if git diff --cached --quiet; then
+            echo '没有变化，跳过提交'
+          else
+            git commit -m 'chore: 每日更新工作日志'
+            git push
+          fi
+
+      - name: 把新页面推给 Worker（页面打开时会拉它）
+        env:
+          API: ${{ secrets.WORKLOG_API }}
+          TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$API" ] || [ -z "$TOKEN" ]; then
+            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过发布'
+            exit 0
+          fi
+          curl -fsS -X PUT "$API/publish/page.html" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: text/html; charset=utf-8' \
+            --data-binary @worklog.html > /dev/null
+          curl -fsS -X PUT "$API/publish/data.json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data-binary @worklog-data.json > /dev/null
+          echo '已发布到 Worker'

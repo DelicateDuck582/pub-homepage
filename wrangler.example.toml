@@ -1,0 +1,34 @@
+# Cloudflare Worker 配置示例：复制成 wrangler.toml 再改成自己的值
+#   cp wrangler.example.toml wrangler.toml
+# 真实 id 与密钥不要提交（密钥一律用 wrangler secret put）
+name = "worklog-collector"
+main = "_cf_worker_worklog.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+# 每天 21:30（北京时间）抓一次；cron 用 UTC，13:30 UTC = 21:30 UTC+8
+[triggers]
+crons = ["30 13 * * *"]
+
+[vars]
+# 仓库清单：key 是页面上显示的名字，main 是图的根分支
+REPOS = """[
+  {"key":"cloud-mail","repo":"DelicateDuck582/cloud-mail","main":"main","url":"https://github.com/DelicateDuck582/cloud-mail"},
+  {"key":"SPlayer","repo":"DelicateDuck582/SPlayer","main":"dev","url":"https://github.com/DelicateDuck582/SPlayer"}
+]"""
+ME_LOGIN = "DelicateDuck582"
+# 站点仓库（owner/repo）：填了就发 repository_dispatch 叫 Actions 重新渲染页面；不走 Actions 就留空
+DISPATCH_REPO = ""
+
+# Workers AI：逐条判定提交类型（可选）。
+# 不加这段 Worker 照常跑，类型就用「前缀 + 关键词」那套规则；加了就跑
+# @cf/meta/llama-3.3-70b-instruct-fp8-fast，免费额度 10,000 neurons/天（实测 202 条约 38 neurons），
+# 且只判没判过的提交。
+[ai]
+binding = "AI"
+
+# KV：存 data / localData / stage / dataHash / kinds / timeline / page。
+# 先执行 `wrangler kv namespace create WL`，把返回的 id 填到下面
+[[kv_namespaces]]
+binding = "WL"
+id = "<你的 KV 命名空间 id>"

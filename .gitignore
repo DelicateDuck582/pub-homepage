@@ -1,0 +1,18 @@
+# 采集产物与本地文件：都不进仓库
+worklog-data.json
+worklog-kinds.json
+worklog-areas.json
+_publish_token.txt
+_daily_update.log
+_collect.log
+_gen.log
+_pack.log
+*.log
+
+# 打包产物、临时文件
+dist/
+dist.zip
+_*.png
+_page-dbg.html
+_wl-delta-test-*.html
+__pycache__/
