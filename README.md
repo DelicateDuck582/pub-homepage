@@ -56,6 +56,8 @@ wrangler deploy
 > **仓库里不放任何密钥。** 口令一律走 `wrangler secret` / 环境变量 / GitHub Secrets，
 > 本地口令文件（`_publish_token.txt`）与采集产物都在 `.gitignore` 里。
 
-## 字体
+## 来源与说明
 
-拉丁字母用 Inter（SIL Open Font License 1.1，见 `inter-var.woff2`），中文回退系统字体。
+- 首页的版式与配色参考了「二叉树树」的主页（AcoFork，<https://www.acofork.com/>）
+- **这个仓库里的所有代码（页面、采集与生成脚本、Cloudflare Worker）都由 AI 编写。**
+- 拉丁字母用 Inter（SIL Open Font License 1.1，见 `inter-var.woff2`），中文回退系统字体。
