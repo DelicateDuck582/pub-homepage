@@ -17,7 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))   # 脚本所在目录（本�
 SITE = os.environ.get("WORKLOG_SITE") or HERE       # 默认写到脚本所在目录（克隆下来直接能跑）
 # 页面打开时会先去这个地址拉一次最新数据（/stage.json、/timeline.json）；留空则完全不联网（纯静态）
 # 环境变量优先，其次用下面这个默认值（部署 Worker 后填这里，见 _cf_deploy.md）
-API_BASE = os.environ.get("WORKLOG_API") or "https://worklog-collector.delicateduck582.workers.dev"
+API_BASE = os.environ.get("WORKLOG_API") or "https://api-www.delicateduck.xyz"
 # 站点仓库（owner/repo）：提示条里的「现在就去重建整页」指向它的 Actions；留空就不显示这个链接
 REPO_SLUG = os.environ.get("WORKLOG_REPO") or "DelicateDuck582/pub-homepage"
 BUILD_AT = datetime.datetime.now().astimezone().isoformat(timespec="seconds")   # 本页构建时间，用于和 Worker 的采集时间比对

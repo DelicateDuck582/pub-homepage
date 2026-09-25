@@ -54,7 +54,7 @@ jobs:
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
           # API 地址兜底：没配就用生成脚本里的默认值对应的那个 Worker
-          api="${API:-https://worklog-collector.delicateduck582.workers.dev}"
+          api="${API:-https://api-www.delicateduck.xyz}"
           # /classify.json 是公开的 GET：先取一份，保证页面不会因为「没配 Secrets」而丢掉 AI 判定
           curl -fsS "$api/classify.json" -o worklog-kinds.json || true
           if [ -z "$TOKEN" ]; then
@@ -102,7 +102,7 @@ jobs:
           API: ${{ secrets.WORKLOG_API }}
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
-          api="${API:-https://worklog-collector.delicateduck582.workers.dev}"
+          api="${API:-https://api-www.delicateduck.xyz}"
           if [ -z "$TOKEN" ]; then
             echo '没配 WORKLOG_PUBLISH_TOKEN，跳过发布（页面已经提交进仓库，配好口令后下次会自动推）'
             exit 0
