@@ -6,7 +6,7 @@ main = "_cf_worker_worklog.js"
 compatibility_date = "2024-11-01"
 workers_dev = true
 
-# 每天 21:30（北京时间）抓一次；cron 用 UTC，13:30 UTC = 21:30 UTC+8
+# 每天 21:30（北京时间）抓一次；cron 用 UTC，13:30 UTC = 21:30 UTC+8。空闲时不写 KV
 [triggers]
 crons = ["30 13 * * *"]
 

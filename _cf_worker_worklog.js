@@ -3,8 +3,9 @@
  * ---------------------------------------------------------------------------
  * 它干三件事：
  *   1) cron（默认每天 21:30 北京时间）：用 GitHub API 抓两个仓库的分支、分叉关系与我的提交，
- *      整理成和本地 worklog-data.json 同构的数据，写进 KV；
- *      数据有变化时可选地给站点仓库发 repository_dispatch，让 GitHub Actions 重新渲染页面。
+ *      整理成和本地 worklog-data.json 同构的数据，只在**真的有变化**时才写 KV（空闲不产生写入）；
+ *      数据一变就顺手判新提交的类型、重建时间线快照，并给站点仓库发 repository_dispatch
+ *      —— 让 GitHub Actions 立刻重新渲染整页（提交节奏 / 分支拓扑 / 分支明细 / 提交时间线四处一起更新）。
  *   2) 可选：用 Workers AI（绑定 AI）逐条判定提交类型（在既有的 13 个类型里选），存 KV 并提供
  *      GET /classify.json 给页面生成脚本取用（没有绑定就跳过，不影响采集）；
  *   3) 给页面打开时「先拉一下」用（KV 里的键：data / localData / stage / dataHash / kinds / timeline / page / pageAt）：
@@ -526,12 +527,20 @@ async function sync(env, force, budget) {
   const hash = await sha1(body);
   const prev = await env.WL.get('dataHash');
   const stage = stageOf(data);
-  await env.WL.put('data', body);
-  await env.WL.put('stage', JSON.stringify(stage));
-  await env.WL.put('dataHash', hash);
+  const changed = force || hash !== prev || !prev;
+  const total = data.repos.reduce((s, r) => s + r.commits.length, 0);
+  /* 采集可以跑得勤（cron 每 10 分钟一次），但空闲时一个键都不写：免费额度里每天只有 1,000 次写 */
+  if (changed) {
+    await env.WL.put('data', body);
+    await env.WL.put('stage', JSON.stringify(stage));
+    await env.WL.put('dataHash', hash);
+  }
+
   /* AI 类型判定：数据变了、或还有提交没判过，就顺手做几批（失败不影响采集结果） */
   let kinds = 'skipped';
-  if (force || hash !== prev || !(await env.WL.get('kinds'))) {
+  const store = changed ? {} : ((await env.WL.get('kinds', 'json')) || {});
+  const judged = Object.keys(store.kinds || {}).length;
+  if (changed || judged < total) {
     try {
       const r = await classifyKinds(env, 6, false);
       kinds = r.ok === false ? 'failed' : (r.classified + '/' + r.total + '，还差 ' + r.pending);
@@ -540,15 +549,17 @@ async function sync(env, force, budget) {
       console.log('AI 类型判定失败：' + e.message);
     }
   }
-  /* 有新的提交就只判新的那几个，然后把时间线快照（含刚判出来的类型）写进 KV */
-  await putTimeline(env, data);
+  /* 时间线快照（含刚判出来的类型）：数据变了、或快照条数对不上才重建 */
+  const tl = changed ? null : await env.WL.get('timeline', 'json');
+  if (!tl || (tl.mine || 0) !== total) await putTimeline(env, data);
+
   let dispatched = false;
-  if ((force || hash !== prev) && env.DISPATCH_REPO) {
-    /* 数据有变化：叫站点仓库重新渲染一次页面（GitHub Actions 里跑生成脚本 → Pages 自动发布） */
+  if (changed && env.DISPATCH_REPO) {
+    /* 数据有变化：叫站点仓库重新渲染一次整页（Actions 跑生成脚本 → 四处一起更新 → 顺带推回这里） */
     await ghWrite(env, `/repos/${env.DISPATCH_REPO}/dispatches`, { event_type: 'worklog-refresh' });
     dispatched = true;
   }
-  return { ok: true, changed: force || hash !== prev, dispatched, mine: stage.mine, generatedAt: stage.generatedAt, kinds };
+  return { ok: true, changed, judged, total, dispatched, mine: stage.mine, generatedAt: stage.generatedAt, kinds };
 }
 
 function textOut(body, type, status) {

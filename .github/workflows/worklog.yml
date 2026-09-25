@@ -1,77 +1,99 @@
-# 每日更新工作日志（GitHub Actions 版，可选）
+# 工作日志：云端每天重建整页（提交节奏 / 分支拓扑 / 分支明细 / 提交时间线）
 #
-# 场景：本机不常开机，希望由 GitHub 每天自动采一次、重新渲染并发布。
-# 放置位置：站点仓库（部署 Cloudflare Pages 的项目 www-32321 对应的仓库）的 .github/workflows/worklog-daily.yml
+# 分工：Worker 负责「采集数据 + AI 逐条判类型 + 时间线快照」，这些都在 KV 里；
+#       本工作流负责「把整页渲染出来」，四处统计与图都在这一步产出。
+#       这样电脑不开机，图表也会每天自己更新；页面上还能看到当天新增的提交清单。
+#
+# 节奏：每天 21:30（北京）Worker 抓一次数据；数据有变化它立刻发 repository_dispatch 叫这里跑，
+#       另外这里自己也有一份 21:40 的定时兜底（cron 用 UTC）。
 #
 # 需要准备：
-#   1) 站点仓库里放好采集/生成脚本：_collect.py、_gen_worklog.py、inter-var.woff2
-#      （两个脚本的数据与字体路径都取脚本同目录，输出可用环境变量覆盖）
-#   2) 站点仓库根目录要有 index.html（生成脚本把它当模板），产物写回 worklog.html
-#   3) Secrets：SRC_TOKEN（只读两个源仓库的 token）、WORKLOG_API（Worker 地址）、
-#      WORKLOG_PUBLISH_TOKEN（Worker 的发布口令，用来把页面推给 Worker）
-#   4) cron 用 UTC：13:30 UTC = 北京时间 21:30
-name: worklog-daily
+#   1) 站点仓库根目录要有：index.html（模板）、_collect.py、_gen_worklog.py、inter-var.woff2、worklog.html（产物）
+#   2) Secrets（都在这个仓库里配）：
+#        WORKLOG_API              Worker 地址，例如 https://worklog-collector.xxx.workers.dev
+#        WORKLOG_PUBLISH_TOKEN    Worker 的发布口令（写接口用）
+#        SRC_TOKEN                可选：只读两个源仓库的 token；源仓库是公开的，不配也能跑（只是容易被限流）
+name: worklog
 
 on:
   schedule:
-    - cron: '30 13 * * *'
-  workflow_dispatch:                     # 手动跑一次
-  repository_dispatch:                   # Worker 发现数据有变化时会发这个事件
+    - cron: '40 13 * * *'                # 每天 21:40 北京时间（Worker 21:30 抓完数据的兜底）
+  workflow_dispatch:                     # 手动跑一次（页面上的「立即重建」链接也指到这里）
+  repository_dispatch:                   # Worker 发现数据有变化时发这个事件，等于当天近实时
     types: [worklog-refresh]
 
+permissions:
+  contents: write                        # 只为了把新的 worklog.html 提交回本仓库
+
+concurrency:
+  group: worklog
+  cancel-in-progress: false              # 上一次没跑完就排队，别互相覆盖
+
 jobs:
-  update:
+  render:
     runs-on: ubuntu-latest
     steps:
       - name: 取出站点仓库
         uses: actions/checkout@v4
 
-      - name: 拉取两个源仓库的提交图（不拉文件内容，很快）
+      - name: 拉两个源仓库的提交图（只取提交元数据，很快）
+        env:
+          SRC_TOKEN: ${{ secrets.SRC_TOKEN }}
         run: |
-          git clone --bare --filter=blob:none \
-            https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/DelicateDuck582/cloud-mail.git cloud-mail.git
-          git clone --bare --filter=blob:none \
-            https://x-access-token:${{ secrets.SRC_TOKEN }}@github.com/DelicateDuck582/SPlayer.git SPlayer.git
+          auth=""
+          if [ -n "$SRC_TOKEN" ]; then auth="x-access-token:${SRC_TOKEN}@"; fi    # 公开仓库可以不带 token
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/cloud-mail.git" cloud-mail.git
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/SPlayer.git" SPlayer.git
 
-      - name: 取回 AI 类型判定（可选：没配 API/TOKEN 就跳过）
+      - name: 采集（原始时区、改动目录、分支分叉关系都算在本地这套口径里）
+        run: python _collect.py
+
+      - name: 让 Worker 判新提交的类型，并把全部类型判定取回来
         env:
           API: ${{ secrets.WORKLOG_API }}
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
           if [ -z "$API" ] || [ -z "$TOKEN" ]; then
-            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过（类型仍按前缀 + 关键词那套规则）'
+            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过（类型退回「前缀 + 关键词」规则）'
             exit 0
           fi
-          # 类型判定由 Worker 那边增量维护（cron 每天补几批，本地 _daily_update.ps1 也会补），这里只取现成的
+          # 先把这份数据推给 Worker（它顺手刷新 stage / dataHash / localData 与时间线快照），再让它补判新提交
+          curl -fsS -X PUT "$API/publish/data.json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data-binary @worklog-data.json > /dev/null || true
+          curl -fsS -X POST "$API/classify?batches=6" -H "Authorization: Bearer $TOKEN" > /dev/null || true
           curl -fsS "$API/classify.json" -o worklog-kinds.json || true
 
-      - name: 采集 + 生成
+      - name: 渲染整页（四处统计与图都在这一步产出）
         env:
           WORKLOG_API: ${{ secrets.WORKLOG_API }}
-        run: |
-          python _collect.py
-          python _gen_worklog.py
+        run: python _gen_worklog.py
 
-      - name: 采集 + 生成
-        env:
-          WORKLOG_API: ${{ secrets.WORKLOG_API }}
+      - name: 判断页面真的变了没有（抹掉构建时间戳再比，避免每半小时白提一次）
+        id: diff
         run: |
-          python _collect.py
-          python _gen_worklog.py
+          norm() { sed -E 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}/<BUILD>/g' "$1"; }
+          git show HEAD:worklog.html > _prev.html 2>/dev/null || : > _prev.html
+          if diff -q <(norm _prev.html) <(norm worklog.html) > /dev/null; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo '内容没变（只差构建时间戳），跳过提交与发布'
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            echo '内容有变化，准备提交并发布'
+          fi
 
-      - name: 有变化就提交回仓库（Pages 会自动发布）
+      - name: 提交回仓库（Cloudflare Pages 会自动发布）
+        if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add worklog.html
-          if git diff --cached --quiet; then
-            echo '没有变化，跳过提交'
-          else
-            git commit -m 'chore: 每日更新工作日志'
-            git push
-          fi
+          git commit -m "chore: 更新工作日志（$(date -u +%Y-%m-%dT%H:%MZ)）"
+          git push
 
-      - name: 把新页面推给 Worker（页面打开时会拉它）
+      - name: 把新页面推给 Worker（页面打开时会自动换成这一版）
+        if: steps.diff.outputs.changed == 'true'
         env:
           API: ${{ secrets.WORKLOG_API }}
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
@@ -89,3 +111,4 @@ jobs:
             -H 'Content-Type: application/json; charset=utf-8' \
             --data-binary @worklog-data.json > /dev/null
           echo '已发布到 Worker'
+

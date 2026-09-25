@@ -22,8 +22,14 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
      例如 `sync(cos-expression): …` 其实是在加新能力，应判 `feat`）；只判没判过的提交，结果缓存进 KV；
    - 把时间线快照存进 KV，并开 `GET /timeline.json?since=<ISO>` 给页面取增量。
 
+4. `.github/workflows/worklog.yml`：每天 21:40（北京）在 **GitHub Actions** 里把整页重渲染一遍 ——
+   拉两个仓库的提交图、跑上面两个脚本、把新的 `worklog.html` 提交回仓库，并推给 Worker。
+   所以**提交节奏、分支拓扑、分支明细、提交时间线四处图表每天都会自己更新，跟你的电脑开不开机无关**；
+   Worker 一发现数据有变化，还会立刻发一次 `repository_dispatch`，让这一步当天就近实时跑完。
+
 页面打开时只做三件事：`GET /stage.json` 比一下构建时间 → 有更新的整页就整页替换 →
-否则 `GET /timeline.json?since=<本页构建时间>` 把新提交补在顶部提示条里（带类型胶囊）。
+否则 `GET /timeline.json?since=<本页构建时间>` 把新提交补在顶部提示条里（带类型胶囊、类型计数，
+以及一个「现在就去重建整页」的链接，指向的就是上面那个工作流）。
 
 ## 本地跑
 

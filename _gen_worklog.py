@@ -18,6 +18,8 @@ SITE = os.environ.get("WORKLOG_SITE") or HERE       # 默认写到脚本所在�
 # 页面打开时会先去这个地址拉一次最新数据（/stage.json、/timeline.json）；留空则完全不联网（纯静态）
 # 环境变量优先，其次用下面这个默认值（部署 Worker 后填这里，见 _cf_deploy.md）
 API_BASE = os.environ.get("WORKLOG_API") or "https://worklog-collector.delicateduck582.workers.dev"
+# 站点仓库（owner/repo）：提示条里的「现在就去重建整页」指向它的 Actions；留空就不显示这个链接
+REPO_SLUG = os.environ.get("WORKLOG_REPO") or "DelicateDuck582/pub-homepage"
 BUILD_AT = datetime.datetime.now().astimezone().isoformat(timespec="seconds")   # 本页构建时间，用于和 Worker 的采集时间比对
 DATA = os.path.join(HERE, "worklog-data.json")
 FONT_FILE = os.path.join(HERE, "inter-var.woff2")
@@ -997,6 +999,9 @@ CSS_C = """
   .wl-fresh-list .wl-new-sub { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wl-fresh-list a { color: var(--accent); text-decoration: none; white-space: nowrap; }
   .wl-fresh-list a:hover { text-decoration: underline; }
+  .wl-fresh-more { margin-top: 8px; opacity: 0.85; }
+  .wl-fresh-more a { color: var(--accent); text-decoration: none; }
+  .wl-fresh-more a:hover { text-decoration: underline; }
   /* 兜底：元素自己带 display（比如 .filter-btn 的 inline-flex）时 [hidden] 会失效，把它压住 */
   [hidden] { display: none !important; }
   /* 悬浮小卡片（替代浏览器原生 title 提示框）：贴指针右下角，贴边自动翻到另一侧 */
@@ -1754,7 +1759,7 @@ FILTER_JS = """
 
       /* ---------- 工作日志：打开时先去 Worker 拉一次（有更新的整页就换掉；否则从 KV 取新提交） ---------- */
       (function () {
-        var api = '__WL_API__', mine = '__WL_BUILD__', KIND_CN = __KIND_CN__;
+        var api = '__WL_API__', mine = '__WL_BUILD__', KIND_CN = __KIND_CN__, REPO = '__WL_REPO__';
         if (!api) return;
         var base = api.replace(/[/]+$/, '');
         var host = document.getElementById('wlFresh');
@@ -1796,10 +1801,19 @@ FILTER_JS = """
               + '<span class="wl-new-sub" title="' + esc(x.subject) + '">' + esc(x.subject) + '</span>'
               + '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.short) + ' ↗</a></li>';
           }).join('');
+          var byKind = {};
+          items.forEach(function (x) {
+            var k = KIND_CN[x.kind] || x.kind;
+            byKind[k] = (byKind[k] || 0) + 1;
+          });
+          var stat = Object.keys(byKind).map(function (k) { return k + ' ' + byKind[k]; }).join(' · ');
           host.classList.add('is-list');
-          host.innerHTML = '<div>这页之后又有 ' + items.length + ' 条新提交（Worker 那边合计 '
-            + esc(String(total === undefined || total === null ? '' : total))
-            + ' 条，数据取自 Cloudflare KV）：</div><ul class="wl-fresh-list">' + rows + '</ul>';
+          host.innerHTML = '<div>这页之后又有 ' + items.length + ' 条新提交（' + esc(stat) + '；Worker 那边合计 '
+            + esc(String(total === undefined || total === null ? '' : total)) + ' 条）：</div>'
+            + '<ul class="wl-fresh-list">' + rows + '</ul>'
+            + (REPO ? '<div class="wl-fresh-more">提交节奏、分支拓扑、分支明细与时间线由云端每天重建一次'
+              + '（<a href="https://github.com/' + esc(REPO) + '/actions/workflows/worklog.yml"'
+              + ' target="_blank" rel="noopener">现在就去重建整页</a>）</div>' : '');
           host.hidden = false;
           return true;
         }
@@ -1822,8 +1836,6 @@ FILTER_JS = """
                   var pageAt = stampOf(html);
                   if (pageAt && pageAt > mine && swap(html)) return true;   /* 拿到比本地更新的整页 */
                 }
-                note('刚拉到更新的提交数据（' + (st.last || '-') + ' ｜ 合计 ' + st.mine + ' 条）：'
-                     + '整页会在下次重建时刷新');
                 return false;
               });
           })
@@ -1960,6 +1972,7 @@ if not m:
 tpl = tpl[:m.start()] + '<main class="content" id="home">' + main_html + "  </main>" + tpl[m.end():]
 tpl = tpl.replace("</script>", FILTER_JS.replace("__WL_API__", API_BASE).replace("__WL_BUILD__", BUILD_AT)
                   .replace("__KIND_CN__", json.dumps(KIND_LABEL, ensure_ascii=False))
+                  .replace("__WL_REPO__", REPO_SLUG)
                   + "  </script>", 1)
 
 with open(OUT, "w", encoding="utf-8") as f:
