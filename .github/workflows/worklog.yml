@@ -48,22 +48,26 @@ jobs:
       - name: 采集（原始时区、改动目录、分支分叉关系都算在本地这套口径里）
         run: python _collect.py
 
-      - name: 让 Worker 判新提交的类型，并把全部类型判定取回来
+      - name: 取回类型判定（公开 GET，不需要口令）；有口令时顺带推数据并补判新提交
         env:
           API: ${{ secrets.WORKLOG_API }}
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
-          if [ -z "$API" ] || [ -z "$TOKEN" ]; then
-            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过（类型退回「前缀 + 关键词」规则）'
+          # API 地址兜底：没配就用生成脚本里的默认值对应的那个 Worker
+          api="${API:-https://worklog-collector.delicateduck582.workers.dev}"
+          # /classify.json 是公开的 GET：先取一份，保证页面不会因为「没配 Secrets」而丢掉 AI 判定
+          curl -fsS "$api/classify.json" -o worklog-kinds.json || true
+          if [ -z "$TOKEN" ]; then
+            echo '没配 WORKLOG_PUBLISH_TOKEN：跳过「推数据 + 补判新提交」，类型用上面取回的那份'
             exit 0
           fi
           # 先把这份数据推给 Worker（它顺手刷新 stage / dataHash / localData 与时间线快照），再让它补判新提交
-          curl -fsS -X PUT "$API/publish/data.json" \
+          curl -fsS -X PUT "$api/publish/data.json" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
             --data-binary @worklog-data.json > /dev/null || true
-          curl -fsS -X POST "$API/classify?batches=6" -H "Authorization: Bearer $TOKEN" > /dev/null || true
-          curl -fsS "$API/classify.json" -o worklog-kinds.json || true
+          curl -fsS -X POST "$api/classify?batches=6" -H "Authorization: Bearer $TOKEN" > /dev/null || true
+          curl -fsS "$api/classify.json" -o worklog-kinds.json || true
 
       - name: 渲染整页（四处统计与图都在这一步产出）
         env:
@@ -98,15 +102,16 @@ jobs:
           API: ${{ secrets.WORKLOG_API }}
           TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
-          if [ -z "$API" ] || [ -z "$TOKEN" ]; then
-            echo '没配 WORKLOG_API / WORKLOG_PUBLISH_TOKEN，跳过发布'
+          api="${API:-https://worklog-collector.delicateduck582.workers.dev}"
+          if [ -z "$TOKEN" ]; then
+            echo '没配 WORKLOG_PUBLISH_TOKEN，跳过发布（页面已经提交进仓库，配好口令后下次会自动推）'
             exit 0
           fi
-          curl -fsS -X PUT "$API/publish/page.html" \
+          curl -fsS -X PUT "$api/publish/page.html" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: text/html; charset=utf-8' \
             --data-binary @worklog.html > /dev/null
-          curl -fsS -X PUT "$API/publish/data.json" \
+          curl -fsS -X PUT "$api/publish/data.json" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
             --data-binary @worklog-data.json > /dev/null
