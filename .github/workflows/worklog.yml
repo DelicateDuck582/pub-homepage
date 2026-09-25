@@ -74,7 +74,7 @@ jobs:
           WORKLOG_API: ${{ secrets.WORKLOG_API }}
         run: python _gen_worklog.py
 
-      - name: 判断页面真的变了没有（抹掉构建时间戳再比，避免每半小时白提一次）
+      - name: 判断页面真的变了没有（抹掉构建时间戳再比，避免每天白提一次）
         id: diff
         run: |
           norm() { sed -E 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}/<BUILD>/g' "$1"; }
