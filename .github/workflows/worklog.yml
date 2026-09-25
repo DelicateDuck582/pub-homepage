@@ -9,10 +9,13 @@
 #
 # 需要准备：
 #   1) 站点仓库根目录要有：index.html（模板）、_collect.py、_gen_worklog.py、inter-var.woff2、worklog.html（产物）
-#   2) Secrets（都在这个仓库里配）：
-#        WORKLOG_API              Worker 地址，例如 https://worklog-collector.xxx.workers.dev
-#        WORKLOG_PUBLISH_TOKEN    Worker 的发布口令（写接口用）
-#        SRC_TOKEN                可选：只读两个源仓库的 token；源仓库是公开的，不配也能跑（只是容易被限流）
+#   2) 地址与口令（可选，放哪边都行）：
+#        WORKLOG_API              Worker 地址。不配就用代码里的默认值（自定义域名），一样能用
+#        WORKLOG_PUBLISH_TOKEN     Worker 的发布口令；不配就只提交回仓库、不推 Worker
+#      放法：Settings → Secrets and variables → Actions 里的「Secret」或「Variable」都读得到；
+#      若放进 Environments，则要在下面的 job 上补一行 `environment: 环境名` 才读得到
+#      （并且别给那个环境配「必需审查者 / 等待计时器」，否则每天会被卡住等审批）。
+#   3) SRC_TOKEN 可选：只读两个源仓库的 token；源仓库是公开的，不配也能跑（只是容易被限流）
 name: worklog
 
 on:
@@ -38,7 +41,7 @@ jobs:
 
       - name: 拉两个源仓库的提交图（只取提交元数据，很快）
         env:
-          SRC_TOKEN: ${{ secrets.SRC_TOKEN }}
+          SRC_TOKEN: ${{ vars.SRC_TOKEN || secrets.SRC_TOKEN }}
         run: |
           auth=""
           if [ -n "$SRC_TOKEN" ]; then auth="x-access-token:${SRC_TOKEN}@"; fi    # 公开仓库可以不带 token
@@ -50,8 +53,8 @@ jobs:
 
       - name: 取回类型判定（公开 GET，不需要口令）；有口令时顺带推数据并补判新提交
         env:
-          API: ${{ secrets.WORKLOG_API }}
-          TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
+          API: ${{ vars.WORKLOG_API || secrets.WORKLOG_API }}
+          TOKEN: ${{ vars.WORKLOG_PUBLISH_TOKEN || secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
           # API 地址兜底：没配就用生成脚本里的默认值对应的那个 Worker
           api="${API:-https://api-www.delicateduck.xyz}"
@@ -71,7 +74,7 @@ jobs:
 
       - name: 渲染整页（四处统计与图都在这一步产出）
         env:
-          WORKLOG_API: ${{ secrets.WORKLOG_API }}
+          WORKLOG_API: ${{ vars.WORKLOG_API || secrets.WORKLOG_API }}
         run: python _gen_worklog.py
 
       - name: 判断页面真的变了没有（抹掉构建时间戳再比，避免每天白提一次）
@@ -99,8 +102,8 @@ jobs:
       - name: 把新页面推给 Worker（页面打开时会自动换成这一版）
         if: steps.diff.outputs.changed == 'true'
         env:
-          API: ${{ secrets.WORKLOG_API }}
-          TOKEN: ${{ secrets.WORKLOG_PUBLISH_TOKEN }}
+          API: ${{ vars.WORKLOG_API || secrets.WORKLOG_API }}
+          TOKEN: ${{ vars.WORKLOG_PUBLISH_TOKEN || secrets.WORKLOG_PUBLISH_TOKEN }}
         run: |
           api="${API:-https://api-www.delicateduck.xyz}"
           if [ -z "$TOKEN" ]; then
