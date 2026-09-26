@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""采集 cloud-mail / SPlayer 两个仓库「所有分支」中 DelicateDuck582 的提交，输出 JSON。
 
-依赖：C:\Users\Public\_worklog-dev\{cloud-mail,SPlayer}.git（--bare --filter=blob:none 克隆，已就绪）。
+依赖：脚本同目录下的 {cloud-mail,SPlayer}.git（--bare --filter=blob:none 克隆）。
 纯本地只读操作。
 """
 import collections
