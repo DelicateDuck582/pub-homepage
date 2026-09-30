@@ -109,6 +109,29 @@ def font_css():
             "  @font-face { font-family: \"Inter var\"; font-style: normal; font-weight: 100 900;\n"
             "    font-display: swap; src: url(data:font/woff2;base64,%s) format(\"woff2\"); }\n" % b64)
 
+
+# index.html 里按相对路径外链的那份字体声明（模板原样）
+FONT_LINK_BLOCK = """  @font-face {
+    font-family: "Inter var";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("inter-var.woff2") format("woff2");
+  }
+"""
+
+
+def embed_font(tpl):
+    """把模板里外链的 Inter 换成内嵌 base64：worklog.html 会被单独投放（Worker 的 /page.html），
+    跨源打开时相对路径拿不到字体，必须自包含。找不到字体文件 / 模板声明时按原样返回。"""
+    block = font_css()
+    if not block:
+        return tpl
+    if FONT_LINK_BLOCK not in tpl:
+        print("提示：模板里没找到外链字体声明，字体仍按外链引用")
+        return tpl.replace("</style>", block + "</style>", 1)
+    return tpl.replace(FONT_LINK_BLOCK, block, 1)
+
 ICONS = {
     "git": '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
     "file": '<path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5L14 3.5Z"/><path d="M14 3.5v4h4"/>',
@@ -183,8 +206,7 @@ CSS_A = """
   .g-lane-main { stroke: var(--accent); stroke-width: 2.8; }   /* 主分支（图的根） */
   /* 上游（原作者）的部分单独走一个色系：主线里「我接手之前」的那一截、以及从上游提交分出的分叉线。
      这两条必须排在 .g-lane-main / .g-fork 后面，才能盖掉主色 */
-  :root, html[data-theme="dark"] { --up: #82a3cb; }
-  html[data-theme="light"] { --up: #4a6d97; }
+  :root { --up: #949cf5; }
   .g-lane-up { stroke: var(--up); stroke-width: 2.4; }
   /* 整张拓扑图只有三种符号：泳道线、提交圆点、HEAD 空心圆（外加窗口外的折叠点） */
   .g-fork { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: 0.85; fill: none; }
@@ -268,19 +290,19 @@ CSS_B = """
   .kind-val { font-size: 12.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   .kd { display: inline-block; border-radius: 50%; }
   .kind-name .kd { width: 7px; height: 7px; }
-  .kd-feat { background: #cc785c; }
-  .kd-fix { background: #6f9f7d; }
-  .kd-refactor { background: #7d8fbf; }
-  .kd-merge { background: #a98bc0; }
-  .kd-docs { background: #c2a25a; }
-  .kd-chore { background: #8f8e86; }
-  .kd-style { background: #b98fa8; }
-  .kd-perf { background: #5f9fa8; }
-  .kd-test { background: #7fa87f; }
-  .kd-build { background: #a08f6f; }
-  .kd-ci { background: #8fa0b8; }
-  .kd-revert { background: #b07d78; }
-  .kd-other { background: #8b8a83; }
+  .kd-feat { background: #38bdf8; }
+  .kd-fix { background: #34d399; }
+  .kd-refactor { background: #a78bfa; }
+  .kd-merge { background: #e879f9; }
+  .kd-docs { background: #facc15; }
+  .kd-chore { background: #9ca3af; }
+  .kd-style { background: #f472b6; }
+  .kd-perf { background: #2dd4bf; }
+  .kd-test { background: #a3e635; }
+  .kd-build { background: #fb923c; }
+  .kd-ci { background: #60a5fa; }
+  .kd-revert { background: #f87171; }
+  .kd-other { background: #71717a; }
 
   /* 筛选 */
   .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -630,8 +652,8 @@ def svg_branch_graph(repo, width=920):
             tip += " ｜ 图中圆点 %s ~ %s" % (min(mine), max(mine))
         if root:
             tip += " ｜ 主分支（图的根）"
-            if up and up["day"]:                   # 主线左端那截蓝线 = 上游作者的 main
-                tip += " ｜ 左边蓝色那一截是上游作者的：%s 之前这条线上还没有我的提交" % up["day"]
+            if up and up["day"]:                   # 主线左端那截浅紫线 = 上游作者的 main
+                tip += " ｜ 左边浅紫那一截是上游作者的：%s 之前这条线上还没有我的提交" % up["day"]
             elif up:
                 tip += " ｜ 这条线上还没有我的提交，整条都是上游作者的"
         elif parent_of[name]:
@@ -899,7 +921,7 @@ split_legend = "".join(
     for i, r in enumerate(repos))
 
 def graph_legend(repo):
-    """拓扑图图例：跟着实际画出来的东西走 —— 没画上游段就不放蓝实线，没有上游分叉就不放蓝虚线。"""
+    """拓扑图图例：跟着实际画出来的东西走 —— 没画上游段就不放浅紫实线，没有上游分叉就不放浅紫虚线。"""
     up = upstream_split(repo)
     forks = fork_stats(repo)
     chips = ['<span><span class="lg-main"></span>主线（%s）</span>' % esc(repo["main"])]
@@ -1872,7 +1894,7 @@ MAIN_TMPL = """
     <!-- 3. 分支拓扑 -->
     <section class="section" id="graph">
       <h2 class="section-title">分支拓扑</h2>
-      <p class="section-desc">每个仓库一张图：横轴时间、纵轴分支泳道。曲线表示「这条分支从哪条分支的哪个提交分出来」，泳道上的圆点是我当天的提交（越大说明当天越多），空心圆是分支 HEAD。蓝色 = 上游作者的部分（主线里我接手之前的那一截、从上游提交分出去的曲线），橙色 = 我的。</p>
+      <p class="section-desc">每个仓库一张图：横轴时间、纵轴分支泳道。曲线表示「这条分支从哪条分支的哪个提交分出来」，泳道上的圆点是我当天的提交（越大说明当天越多），空心圆是分支 HEAD。浅紫 = 上游作者的部分（主线里我接手之前的那一截、从上游提交分出去的曲线），青色 = 我的。</p>
       __GRAPH_CARDS__
     </section>
 
@@ -1957,7 +1979,7 @@ tpl = open(INDEX, encoding="utf-8").read()
 tpl = tpl.replace("<title>首页 | DelicateDuck582</title>", "<title>工作日志 | DelicateDuck582</title>")
 tpl = tpl.replace('<meta name="description" content="DelicateDuck582 的个人主页">',
                   '<meta name="description" content="DelicateDuck582 的工作日志：cloud-mail 与 SPlayer 全部分支的提交记录">')
-tpl = tpl.replace("</style>", CSS_A + CSS_B + CSS_C + font_css() + "\n</style>", 1)
+tpl = embed_font(tpl.replace("</style>", CSS_A + CSS_B + CSS_C + "\n</style>", 1))
 tpl = tpl.replace('<a href="#home">首页</a>', '<a href="index.html">首页</a>')
 tpl = tpl.replace('<span class="current">DelicateDuck582</span>', '<span class="current">工作日志</span>')
 tpl = tpl.replace('href="#about" data-nav="about"', 'href="index.html#about"')

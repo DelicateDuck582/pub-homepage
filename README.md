@@ -64,6 +64,7 @@ wrangler deploy
 
 ## 来源与说明
 
-- 首页的版式与配色参考了「二叉树树」的主页（AcoFork，<https://www.acofork.com/>）
+- 首页走「极简科技黑」：近黑底 + 细描边卡片 + 单一青色点缀（Linear / Vercel 那一类），只有深色一套配色
 - **这个仓库里的所有代码（页面、采集与生成脚本、Cloudflare Worker）都由 AI 编写。**
 - 拉丁字母用 Inter（SIL Open Font License 1.1，见 `inter-var.woff2`），中文回退系统字体。
+  index.html 按相对路径引用它；worklog.html 会被单独投放（Worker 的 `/page.html`），所以内嵌成 base64 自包含。
