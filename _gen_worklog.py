@@ -24,7 +24,15 @@ BUILD_AT = datetime.datetime.now().astimezone().isoformat(timespec="seconds")   
 DATA = os.path.join(HERE, "worklog-data.json")
 FONT_FILE = os.path.join(HERE, "inter-var.woff2")
 INDEX = os.path.join(SITE, "index.html")
-OUT = os.environ.get("WORKLOG_OUT") or os.path.join(SITE, "worklog.html")
+SITE_R = os.path.realpath(SITE)
+OUT = os.path.realpath(os.environ.get("WORKLOG_OUT") or os.path.join(SITE, "worklog.html"))
+# 产物只允许落在站点目录内：realpath 归一化后做包含校验，WORKLOG_OUT 被配到目录外直接报错
+try:
+    _inside = os.path.commonpath([OUT, SITE_R]) == SITE_R
+except ValueError:                    # Windows 跨盘符时 commonpath 抛 ValueError
+    _inside = False
+if not _inside:
+    raise SystemExit("WORKLOG_OUT 必须位于站点目录内（WORKLOG_SITE=%s）：%s" % (SITE, OUT))
 
 # 与本人工作无关的自动分支（Cloudflare Pages / Workers 编译产物分支等），不放进页面
 BRANCH_HIDE = re.compile(r"^(cloudflare/|cf-|workers-|dependabot/|renovate/)", re.I)
@@ -660,8 +668,10 @@ def svg_branch_graph(repo, width=920):
             tip += " ｜ 从 %s 的 %s（%s）分出%s" % (
                 parent_of[name], b.get("fork_point"), fork_of[name],
                 "，那个提交是上游作者的" if fork_owner(repo, b) == "up" else "")
-        if b.get("merged_into"):
-            tip += " ｜ 已并回 %s" % b["merged_into"]
+        if b.get("parent") and b.get("merged_into"):   # 图根没有父分支，不该出现「已并回」
+            # 口径与分支明细表一致：有 merge 提交才算「已并回」，只是被包含则说明是续写
+            tip += (" ｜ 内容已含于 %s（无合并提交）" if b.get("merged_kind") == "contained"
+                    else " ｜ 已并回 %s") % b["merged_into"]
         out.append('<text class="g-label" x="16" y="%d" data-tip="%s">%s</text>'
                    % (y + 4, esc(tip), esc(lane_label(name))))
         out.append('<text class="g-meta" x="%d" y="%d" text-anchor="end">%d / %d</text>'
@@ -879,7 +889,9 @@ def html_branch_table(repo):
         else:
             fork = "从 %s 分出（%s @ %s）" % (b["parent"], b["fork_point"], (b["fork_date"] or "")[:10])
             if b.get("merged_into"):
-                fork += "，已并回 %s" % b["merged_into"]
+                # 有 merge 提交才是真合并；否则只是被对方从 tip 直接续写（内容已含于）
+                fork += ("，内容已含于 %s（无合并提交）" if b.get("merged_kind") == "contained"
+                         else "，已并回 %s") % b["merged_into"]
         span = "—" if not b["first"] else (b["first"] if b["first"] == b["last"]
                                            else "%s ~ %s" % (b["first"], b["last"]))
         rows.append('<tr><td><code>%s</code></td><td class="num">%d</td><td class="num">%d</td>'

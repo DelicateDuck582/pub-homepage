@@ -5,6 +5,7 @@ r"""采集 cloud-mail / SPlayer 两个仓库「所有分支」中 DelicateDuck58
 纯本地只读操作。
 """
 import collections
+import datetime
 import json
 import os
 import re
@@ -68,6 +69,22 @@ def is_ancestor(repo, a, b):
     p = subprocess.run(["git", "-C", repo, "merge-base", "--is-ancestor", a, b],
                        capture_output=True, text=True)
     return p.returncode == 0
+
+
+def dt(s):
+    """%aI 的 ISO 串 → 带时区的 datetime：跨时区偏移时字符串序 ≠ 时间序，必须按真实时刻比。"""
+    try:
+        return datetime.datetime.fromisoformat(s)
+    except ValueError:
+        return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+
+
+def merged_by_merge(repo, target, sha):
+    """target 里是否存在把 sha 直接当父的 merge 提交；没有就只是「从 sha 的 tip 续写」，不是真合并。"""
+    for line in git(repo, "rev-list", "--merges", "--parents", target).splitlines():
+        if sha in line.split()[1:]:              # 第 0 列是 merge 提交自身，父从第 1 列起
+            return True
+    return False
 
 
 def is_me(name, email):
@@ -138,7 +155,7 @@ for cfg in REPOS:
         branch_meta.append(dict(name=br, head=git(repo, "rev-parse", "--short", br).strip(),
                                 head_date=git(repo, "log", "-1", "--format=%aI", br).strip()[:10],
                                 commits_total=total, commits_mine=mine,
-                                parent="", fork_point="", fork_date="", merged_into="",
+                                parent="", fork_point="", fork_date="", merged_into="", merged_kind="",
                                 first=days[0] if days else "", last=days[-1] if days else "",
                                 span=(days[-1][:4] + "-" + days[-1][5:7]) if days else ""))
 
@@ -158,16 +175,27 @@ for cfg in REPOS:
                 continue
             if not mb or mb == shas[me]:
                 continue                          # 分叉点就是本分支自己 → p 其实是从本分支派生的
-            cands.append((mb == shas[p], git(repo, "log", "-1", "--format=%aI", mb).strip(),
+            cands.append((mb == shas[p], dt(git(repo, "log", "-1", "--format=%aI", mb).strip()),
                           p == cfg["main"], mb[:7], p))
+        # 同一分叉点上的并列要按拓扑分先后：若 p 是从 p2 续写出来的（merge-base 同为 mb、且 p2 是 p 的祖先），
+        # 那 p 只是新长出来的下游分支，不能抢走父分支归属（否则「今天才分出的分支」会被判成父分支）。
+        cands = [c for c in cands if not any(
+            d[4] != c[4] and d[3] == c[3]                    # 同一分叉点（abbrev 相同即同一提交）
+            and is_ancestor(repo, d[4], c[4])                # d 是 c 的祖先
+            and not is_ancestor(repo, c[4], d[4])            # 且二者不互为祖先（避免退化时全被丢弃）
+            for d in cands)]
         if cands:
             # ① 分叉点正好是对方 HEAD（直接接续）② 分叉点时间更晚 ③ 平手时优先主分支
             cands.sort(reverse=True)
-            _, mb_date, _, mb_short, parent = cands[0]
-            b["parent"], b["fork_point"], b["fork_date"] = parent, mb_short, mb_date[:16]
+            _, mb_dt, _, mb_short, parent = cands[0]
+            b["parent"], b["fork_point"] = parent, mb_short
+            b["fork_date"] = mb_dt.isoformat()[:16]
         for q in shas:                            # 已被谁完全包含 → 内容其实已并回那条分支
             if q != me and is_ancestor(repo, me, q):
                 b["merged_into"] = q
+                # 包含 ≠ 合并：再查 q 的 merge 提交里有没有把 me 的完整 SHA 当父的，
+                # 有才是真合并，否则只是「从 me 的 tip 直接续写」（如 NEWAPI 续写 feat/api-enhanced）。
+                b["merged_kind"] = "merge" if merged_by_merge(repo, q, shas[me]) else "contained"
                 break
 
     # 这些提交改动了哪些文件（--author 过滤在 git 端完成，避免对整个历史做 tree diff）
@@ -216,7 +244,10 @@ for cfg in REPOS:
                    active_days=len({c["day"] for c in mine_list}),
                    merges=sum(1 for c in mine_list if len(c["parents"]) > 1))))
 
-path = os.path.join(WORK, "worklog-data.json")
+path = os.path.realpath(os.path.join(WORK, "worklog-data.json"))
+# 产物只允许落在脚本目录内：realpath 归一化后做包含校验，路径被带出目录直接报错
+if os.path.commonpath([path, WORK]) != WORK:
+    raise SystemExit("采集产物路径越界：%s" % path)
 with open(path, "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, indent=1)
 
