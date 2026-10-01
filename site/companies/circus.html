@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="CIRCUS 在 Steam 上发行的 GALGAME 补丁下载">
+<title>CIRCUS 的游戏 · GALGAME 补丁搜索</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0b;
+    --card: #111113;
+    --card-hover: #17171a;
+    --fg: #ededed;
+    --muted: #8e8e96;
+    --border: rgba(237, 237, 237, 0.09);
+    --border-strong: rgba(237, 237, 237, 0.22);
+    --accent: #38bdf8;
+    --accent-soft: rgba(56, 189, 248, 0.13);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --font: -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  ::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  body {
+    font-family: var(--font);
+    color: var(--fg);
+    background: var(--bg);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ========== 顶栏 ========== */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 56px;
+    padding: 8px 6vw;
+    background: rgba(10, 10, 11, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .back {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    transition: color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .back:hover { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .site-name {
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .header-right { margin-left: auto; flex-shrink: 0; }
+  .lang-btn {
+    padding: 5px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    cursor: pointer;
+    transition: color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .lang-btn:hover { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+  /* ========== 内容列 ========== */
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  .list-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .list-head h2 { font-size: 18px; font-weight: 700; color: var(--fg); }
+  .list-head h2 span { font-weight: 600; color: var(--muted); }
+  .list-head .count {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ========== 游戏行 ========== */
+  .game-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 18px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+  }
+  .game-item:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--card-hover);
+  }
+  .game-main { min-width: 0; }
+  .game-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .game-alias {
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .game-meta {
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ========== 按钮组 ========== */
+  .btn-group {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+  }
+  .official-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    white-space: nowrap;
+    transition: color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .official-btn:hover { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .download-btn {
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--fg);
+    white-space: nowrap;
+    transition: filter 0.25s var(--ease);
+  }
+  .download-btn:hover { filter: brightness(1.06); }
+  .download-btn.disabled {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .download-btn.disabled:hover { filter: none; }
+
+  /* ========== 提示区（正文，可保留少量 emoji） ========== */
+  .notice {
+    margin-bottom: 16px;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+  .notice a { color: var(--accent) !important; font-weight: 600; }
+
+  .copyright-link { color: inherit; text-decoration: none; }
+
+  footer {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .game-item { flex-direction: column; align-items: stretch; }
+    .btn-group { justify-content: flex-end; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../web.html" data-i18n="back">← 返回会社列表</a>
+  <span class="site-name">GALGAME 补丁搜索</span>
+  <div class="header-right">
+    <button type="button" id="langToggle" class="lang-btn" title="切换语言 / Change Language">EN</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="list-head">
+    <h2>CIRCUS<span data-i18n="ofGames">的游戏</span></h2>
+    <span class="count" id="listCount"></span>
+  </div>
+  <div id="gameList"></div>
+</div>
+
+<footer>
+  <p data-i18n-html="footer"><a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME 补丁搜索 · 收录 Steam 平台 GALGAME · 补丁仅供学习交流，请支持正版</p>
+</footer>
+
+<script>
+// ============================================================
+// 数据区：该会社在 Steam 上发行的游戏（补丁下载链接）
+// ============================================================
+const COMPANY_NAME = "CIRCUS";
+const GAMES = [
+  { name: "恋因天赐!! Present From Angel", alias: "", link: "https://example.com", official: "https://patches.kagamied.com/" }
+];
+// ============================================================
+
+// ============ 国际化 ============
+const LANG_KEY = 'vndb_lang';
+let lang = 'zh';
+try {
+  const savedLang = localStorage.getItem(LANG_KEY);
+  if (savedLang) lang = savedLang;
+} catch (e) {}
+
+const I18N = {
+  'back': {'zh': '← 返回会社列表', 'en': '← Back to companies'},
+  'ofGames': {'zh': '的游戏', 'en': "'s games"},
+  'officialPage': {'zh': '官方下载页面', 'en': 'Official Page'},
+  'download': {'zh': '⬇ 下载', 'en': '⬇ Download'},
+  'footer': {'zh': '<a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME 补丁搜索 · 收录 Steam 平台 GALGAME · 补丁仅供学习交流，请支持正版',
+             'en': '<a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME Patch Search · Steam GALGAME collection · Patches for learning only, please support the official release'}
+};
+
+function t(key) {
+  const m = I18N[key];
+  return m ? (m[lang] || m['zh']) : key;
+}
+
+function setLang() {
+  document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+  document.querySelectorAll('[data-i18n]').forEach(function (el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(function (el) {
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
+  const btn = document.getElementById('langToggle');
+  if (btn) btn.textContent = lang === 'en' ? '中文' : 'EN';
+  renderGames();
+}
+
+const listEl = document.getElementById('gameList');
+const countEl = document.getElementById('listCount');
+
+function renderGames() {
+  listEl.innerHTML = '';
+  countEl.textContent = lang === 'en' ? GAMES.length + ' games' : '共 ' + GAMES.length + ' 款';
+  GAMES.forEach(function (game) {
+    const item = document.createElement('div');
+    item.className = 'game-item';
+    // 注意：name / alias 是数据里有意的内联 HTML（如 favorite 的 <br>），不做 escapeHtml
+    let aliasHtml = '';
+    if (game.alias) {
+      aliasHtml = '<div class="game-alias">' + game.alias + '</div>';
+    }
+    let btnHtml = '';
+    if (game.official) {
+      btnHtml += '<a class="official-btn" href="' + game.official + '" target="_blank" rel="noopener">' + t('officialPage') + '</a>';
+    }
+    const disabled = game.link === 'https://example.com' ? ' disabled' : '';
+    btnHtml += '<a class="download-btn' + disabled + '" href="' + game.link + '" target="_blank" rel="noopener"' + (disabled ? ' aria-disabled="true" tabindex="-1"' : '') + '>' + t('download') + '</a>';
+    item.innerHTML =
+      '<div class="game-main">' +
+        '<div class="game-name">' + game.name + '</div>' +
+        aliasHtml +
+        '<div class="game-meta">' + COMPANY_NAME + ' · Steam</div>' +
+      '</div>' +
+      '<div class="btn-group">' + btnHtml + '</div>';
+    listEl.appendChild(item);
+  });
+}
+
+// ========== 语言切换 ==========
+(function initLang() {
+  const btn = document.getElementById('langToggle');
+  if (btn) btn.addEventListener('click', function () {
+    lang = lang === 'zh' ? 'en' : 'zh';
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    setLang();
+  });
+  setLang();
+})();
+</script>
+</body>
+</html>

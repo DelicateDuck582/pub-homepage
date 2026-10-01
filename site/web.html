@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="GALGAME 补丁搜索 —— 收录 Steam 平台发布的 GALGAME 中文补丁资源">
+<title>GALGAME 补丁搜索 · Steam</title>
+<style>
+  /* ============================================================
+     Design Tokens（DESIGN_SPEC v1 §1）
+     ============================================================ */
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0b;
+    --card: #111113;
+    --card-hover: #17171a;
+    --fg: #ededed;
+    --muted: #8e8e96;
+    --border: rgba(237, 237, 237, 0.09);
+    --border-strong: rgba(237, 237, 237, 0.22);
+    --accent: #38bdf8;
+    --accent-soft: rgba(56, 189, 248, 0.13);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --font: -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  ::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* 滚动条深色化 */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #2f2f36 transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2f2f36; border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: var(--mono); font-size: 12px; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* ========== 顶栏 ========== */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(10, 10, 11, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 56px;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .brand-logo {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .brand-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ========== 按钮 ========== */
+  .btn-primary {
+    height: 48px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--fg);
+    color: var(--bg);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.25s var(--ease);
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary:disabled {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    filter: none;
+  }
+  .btn-ghost {
+    background: transparent;
+    border: 0;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    color: var(--fg);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: box-shadow 0.25s var(--ease), color 0.25s var(--ease);
+  }
+  .btn-ghost:hover { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
+  .btn-ghost:disabled {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  /* ========== 内容列 ========== */
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* ========== 搜索区 ========== */
+  .search-box { display: flex; gap: 10px; }
+  .search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 48px;
+    padding: 0 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 15px;
+    transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  }
+  .search-input::placeholder { color: var(--muted); }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .search-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+  .segmented button {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), color 0.25s var(--ease);
+  }
+  .segmented button:hover { color: var(--fg); }
+  .segmented button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+  .search-tip { margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .mode-tip {
+    margin-top: 12px;
+    padding: 9px 12px;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .status {
+    margin: 20px 0 10px;
+    min-height: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .results { display: flex; flex-direction: column; gap: 10px; }
+  .row-hint { padding: 16px 2px; font-size: 13px; color: var(--muted); }
+
+  /* ========== 搜索结果行（DESIGN_SPEC §4） ========== */
+  .row, .vn-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+  }
+  .row:hover, .vn-group:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--card-hover);
+  }
+  .row { display: flex; gap: 14px; padding: 14px; }
+
+  .thumb { flex: 0 0 96px; width: 96px; }
+  .thumb img {
+    display: block;
+    width: 96px;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .thumb-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    aspect-ratio: 2 / 3;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .row-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .row-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+  .row-title .title { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+  .row-title .alt {
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 11px;
+    line-height: 1.8;
+    padding: 0 7px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    color: var(--muted);
+  }
+  .chip.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+
+  .row-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .link-accent { color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; }
+  .link-accent:hover { text-decoration: underline; }
+
+  .expand-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 22px; }
+  .expand-btn svg { transition: transform 0.25s var(--ease); }
+  .expand-btn[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+  /* ========== 展开详情面板 ========== */
+  .detail-panel {
+    display: none;
+    margin-top: 4px;
+    padding: 12px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .detail-panel.open { display: block; }
+  .detail-flex { display: flex; gap: 14px; align-items: flex-start; }
+  .detail-img {
+    flex: 0 0 auto;
+    width: 180px;
+    max-width: 180px;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .detail-info { flex: 1 1 auto; min-width: 0; }
+  .detail-row { font-size: 13px; margin-bottom: 4px; color: var(--muted); overflow-wrap: anywhere; }
+  .detail-row b { font-weight: 600; color: var(--fg); }
+  .detail-link { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+  .detail-link:hover { text-decoration: underline; }
+
+  .detail-desc-wrap { margin-top: 8px; }
+  .detail-desc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; user-select: none; }
+  .detail-desc-wrap.expandable .detail-desc-head { cursor: pointer; }
+  .detail-desc-label { font-size: 13px; font-weight: 600; color: var(--fg); }
+  .desc-triangle { display: inline-flex; color: var(--muted); visibility: hidden; }
+  .detail-desc-wrap.expandable .desc-triangle { visibility: visible; }
+  .desc-triangle svg { transition: transform 0.25s var(--ease); }
+  .detail-desc-wrap.open .desc-triangle svg { transform: rotate(90deg); }
+  .detail-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.9;
+    max-height: 96px;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    transition: max-height 0.3s var(--ease);
+  }
+  .detail-desc-wrap.open .detail-desc { max-height: 2000px; }
+  .detail-desc a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+  .detail-desc a:hover { text-decoration: underline; }
+  .detail-spoiler {
+    background: var(--card-hover);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+    cursor: pointer;
+  }
+  .detail-spoiler .spoiler-text { display: none; }
+  .detail-spoiler.revealed .spoiler-text { display: inline; }
+  .detail-spoiler.revealed .spoiler-warn { display: none; }
+  .spoiler-warn { color: #e8a33d; font-size: 11px; font-weight: 600; }
+  .detail-quote {
+    border-left: 3px solid var(--border-strong);
+    padding-left: 9px;
+    margin: 8px 0;
+    color: var(--muted);
+  }
+  .detail-more {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .detail-more:hover { text-decoration: underline; }
+
+  /* ========== 补丁模式：VN 分组 ========== */
+  .vn-group { overflow: hidden; }
+  .vn-head { display: flex; gap: 14px; padding: 14px; }
+  .patch-list { border-top: 1px solid var(--border); }
+  .patch-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--border); }
+  .patch-row:first-child { border-top: 0; }
+  .patch-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .patch-title { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .patch-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .no-patch {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ========== 提示区（合并为一张卡） ========== */
+  .note {
+    margin-top: 36px;
+    padding: 12px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+  .note p + p { margin-top: 10px; }
+  .note b { color: var(--fg); }
+
+  /* ========== 玩过的GAL 折叠区（DESIGN_SPEC §5） ========== */
+  .browse {
+    margin-top: 36px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+  .section-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .section-tip { padding: 0 16px 14px; font-size: 12px; color: var(--muted); }
+  .browse-body { display: none; padding: 16px; border-top: 1px solid var(--border); }
+  .browse-body.open { display: block; }
+
+  .company-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px;
+  }
+  .company-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--fg);
+    text-decoration: none;
+    transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+  }
+  .company-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--card-hover);
+  }
+  .company-card .name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+  .company-card .count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* ========== 页脚 ========== */
+  footer {
+    margin-top: 60px;
+    padding: 24px 20px 40px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+  .copyright-link { color: inherit; text-decoration: none; }
+  .copyright-link:hover { color: var(--accent); text-decoration: underline; }
+
+  /* ========== 移动端 ========== */
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 16px 64px; }
+    .header-inner { padding: 0 16px; }
+    .search-box { flex-wrap: wrap; }
+    .search-input { flex: 1 1 100%; }
+    .search-box .btn-primary { flex: 1 1 auto; }
+    .row, .vn-head { gap: 12px; padding: 12px; }
+    .thumb, .thumb img, .thumb-ph { flex: 0 0 72px; width: 72px; }
+    .detail-flex { flex-direction: column; }
+    .detail-img { width: 100%; max-width: 220px; }
+    .section-head { padding: 12px 14px; }
+    .section-tip { padding: 0 14px 12px; }
+    .browse-body { padding: 14px; }
+    .company-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <img src="logo.png" class="brand-logo" alt="" onerror="this.style.display='none'">
+      <h1 class="brand-name">GALGAME 补丁搜索</h1>
+    </div>
+    <button type="button" id="langToggle" class="btn-ghost btn-sm" title="切换语言 / Change Language">EN</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ========== 搜索区 ========== -->
+  <section class="search">
+    <h2 class="sr-only" id="searchHead" data-i18n="searchHead">VNDB 搜索</h2>
+
+    <form class="search-box" id="searchForm" role="search">
+      <input type="text" id="vndbSearch" class="search-input" placeholder="输入游戏名或补丁关键词…" data-i18n-ph="searchPlaceholder" autocomplete="off" spellcheck="false">
+      <button type="submit" id="vndbSearchBtn" class="btn-primary" data-i18n="searchBtn">搜索</button>
+    </form>
+
+    <div class="search-tools">
+      <div class="segmented" role="group" data-i18n-aria="searchHead" aria-label="VNDB 搜索">
+        <button type="button" id="modePatch" aria-pressed="true" data-i18n="modePatch">补丁搜索</button>
+        <button type="button" id="modeVn" aria-pressed="false" data-i18n="modeVn">游戏搜索</button>
+      </div>
+      <button type="button" id="vndbClearBtn" class="btn-ghost btn-sm" data-i18n="clearBtn" disabled>删除</button>
+    </div>
+
+    <p class="search-tip" data-i18n="searchTip">支持中/英/日搜索</p>
+
+    <p class="mode-tip" id="patchModeTip" data-i18n="patchModeTip">显示匹配游戏的全部官方补丁，含中文的排在前面</p>
+
+    <p class="status" id="resultStatus" aria-live="polite"></p>
+    <div class="results" id="vndbResults"></div>
+  </section>
+
+  <!-- ========== 玩过的GAL 折叠区 ========== -->
+  <section class="browse">
+    <div class="section-head">
+      <h2 class="section-label" data-i18n="browseTitle">玩过的GAL</h2>
+      <button type="button" id="browseToggle" class="btn-ghost btn-sm" aria-controls="browseBody" aria-expanded="false">展开</button>
+    </div>
+    <p class="section-tip" data-i18n="browseTip">经过整理的一些补丁的下载地址，如果没有的在搜索框搜索</p>
+    <div class="browse-body" id="browseBody">
+      <div class="company-grid" id="companyGrid"></div>
+    </div>
+  </section>
+
+  <!-- ========== 提示区（三张提示合并为一张卡，段落间距 10px） ========== -->
+  <div class="note" id="pageNotes">
+    <p data-i18n-html="tipBody">💡 <b>新手必看</b>：点击搜索结果里的<b>标题</b>即可打开 VNDB 对应页面，补丁下载链接位于页面<b>中间表格的 Links 区域</b>，选择 <b>可以打开的页面</b> 即可到官方页面。</p>
+    <p data-i18n-html="declBody">⚠️ <b>声明</b>：本站仅引用官方链接下载，通过官方渠道获取补丁。部分官方站点可能需要<b>科学上网</b>才能访问，如无法打开可尝试其他补丁站点。</p>
+    <p data-i18n-html="aiBody">🤖 所有的代码由AI编写，搜索数据获取方式为VNDB API调用（vndb.org）。在这个页面上的链接大概没有问题。<b style="color:#d43f3f;">！！如果您看到的页面不像官方网站，请立即退出网页！！</b>有任何问题发送到 <b>contact@ciallo.sale</b>。数据不全，您可以到其他网站下载。</p>
+  </div>
+
+</main>
+
+<footer>
+  <p data-i18n-html="footer"><a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME 补丁搜索 · 收录 Steam 平台 GALGAME · 补丁仅供学习交流，请支持正版</p>
+</footer>
+
+<script>
+// ============================================================
+// 数据区：会社名称 / 游戏数量 / 对应的会社页面路径
+// 添加新会社时，在这里加一行，并新建 companies/<名字>.html 页面
+// ============================================================
+const COMPANIES = [
+  { name: "YUZU SOFT", count: 5, page: "companies/yuzu-soft.html" },
+  { name: "NEKO WORKs", count: 4, page: "companies/neko-works.html" },
+  { name: "GIGA × Entergram", count: 1, page: "companies/giga-entergram.html" },
+  { name: "sprite", count: 4, page: "companies/sprite.html" },
+  { name: "Lose", count: 1, page: "companies/lose.html" },
+  { name: "ALcot", count: 1, page: "companies/alcot.html" },
+  { name: "SAGA PLANETS", count: 1, page: "companies/saga-planets.html" },
+  { name: "SWEET&TEA", count: 1, page: "companies/sweet-tea.html" },
+  { name: "PALETTE QUALIA", count: 5, page: "companies/palette-qualia.html" },
+  { name: "FAVORITE", count: 2, page: "companies/favorite.html" },
+  { name: "ASa Project", count: 2, page: "companies/asa-project.html" },
+  { name: "Madosoft", count: 3, page: "companies/madosoft.html" },
+  { name: "Azurite", count: 1, page: "companies/azurite.html" },
+  { name: "Rubi-sama o Agameru Kai", count: 1, page: "companies/rubi-sama.html" },
+  { name: "Cabbage Soft", count: 3, page: "companies/cabbage-soft.html" },
+  { name: "Navel", count: 2, page: "companies/navel.html" },
+  { name: "MOONSTONE Cherry", count: 2, page: "companies/moostone-cherry.html" },
+  { name: "SMEE", count: 1, page: "companies/smee.html" },
+  { name: "Hulotte", count: 1, page: "companies/hulotte.html" },
+  { name: "CIRCUS", count: 1, page: "companies/circus.html" }
+];
+// ============================================================
+
+var lang = 'zh';
+try {
+  var savedLang = localStorage.getItem('vndb_lang');
+  if (savedLang) lang = savedLang;
+} catch (e) {}
+
+const I18N = {
+  'searchHead': {'zh': 'VNDB 搜索', 'en': 'VNDB Search'},
+  'searchTip': {'zh': '支持中/英/日搜索', 'en': 'Chinese/English/Japanese'},
+  'modePatch': {'zh': '补丁搜索', 'en': 'Patch Search'},
+  'modeVn': {'zh': '游戏搜索', 'en': 'VN Search'},
+  'searchPlaceholder': {'zh': '输入游戏名或补丁关键词…', 'en': 'Enter game name or patch keyword…'},
+  'searchBtn': {'zh': '搜索', 'en': 'Search'},
+  'clearBtn': {'zh': '删除', 'en': 'Clear'},
+  'searching': {'zh': '搜索中…', 'en': 'Searching…'},
+  'noResult': {'zh': '无', 'en': 'No results'},
+  'searchFail': {'zh': '搜索失败，请稍后重试', 'en': 'Search failed, please retry later'},
+  'jumpTo': {'zh': '跳转链接 →', 'en': 'Open →'},
+  'browseTitle': {'zh': '玩过的GAL', 'en': 'Played GAL'},
+  'browseTip': {'zh': '经过整理的一些补丁的下载地址，如果没有的在搜索框搜索', 'en': 'Curated patch download links. Search above if not found'},
+  'gamesUnit': {'zh': '款游戏', 'en': 'games'},
+  'langShort': {'zh': '简体中文', 'en': 'Simplified Chinese'},
+  'langTrad': {'zh': '繁體中文', 'en': 'Traditional Chinese'},
+  'langEn': {'zh': 'English', 'en': 'English'},
+  'langJa': {'zh': '日本語', 'en': 'Japanese'},
+  'langKo': {'zh': '한국어', 'en': 'Korean'},
+  'langRu': {'zh': 'Русский', 'en': 'Russian'},
+  'langEs': {'zh': 'Español', 'en': 'Spanish'},
+  'langId': {'zh': 'Bahasa Indonesia', 'en': 'Indonesian'},
+  'langVi': {'zh': 'Tiếng Việt', 'en': 'Vietnamese'},
+  'langTh': {'zh': 'ไทย', 'en': 'Thai'},
+  'langFr': {'zh': 'Français', 'en': 'French'},
+  'langDe': {'zh': 'Deutsch', 'en': 'German'},
+  'langZh': {'zh': '中文', 'en': 'Chinese'},
+  'langJp': {'zh': '日文', 'en': 'Japanese'},
+  'tipBody': {'zh': '💡 <b>新手必看</b>：点击搜索结果里的<b>标题</b>即可打开 VNDB 对应页面，补丁下载链接位于页面<b>中间表格的 Links 区域</b>，选择 <b>可以打开的页面</b> 即可到官方页面。',
+              'en': '💡 <b>Quick Guide</b>: Click a <b>title</b> in the results to open its VNDB page. The patch download link is in the <b>Links</b> section of the middle table. Choose a page that opens to reach the official page.'},
+  'declBody': {'zh': '⚠️ <b>声明</b>：本站仅引用官方链接下载，通过官方渠道获取补丁。部分官方站点可能需要<b>科学上网</b>才能访问，如无法打开可尝试其他补丁站点。',
+               'en': '⚠️ <b>Notice</b>: This site only links to official sources. Some official sites may require <b>a VPN</b>. If unavailable, try other patch sites.'},
+  'aiBody': {'zh': '🤖 所有的代码由AI编写，搜索数据获取方式为VNDB API调用（vndb.org）。在这个页面上的链接大概没有问题。<b style="color:#d43f3f;">！！如果您看到的页面不像官方网站，请立即退出网页！！</b>有任何问题发送到 <b>contact@ciallo.sale</b>。数据不全，您可以到其他网站下载。',
+             'en': '🤖 All code written by AI, search data via VNDB API (vndb.org). Links on this page should be fine. <b style="color:#d43f3f;">!!If the page you see does not look like an official website, leave immediately!!</b> Contact: <b>contact@ciallo.sale</b>. Data is incomplete, you can download elsewhere.'},
+  'detailDeveloper': {'zh': '制作会社', 'en': 'Developer'},
+  'detailReleased': {'zh': '发售日', 'en': 'Released'},
+  'detailPlaytime': {'zh': '游戏时长', 'en': 'Play time'},
+  'detailLinks': {'zh': 'Links', 'en': 'Links'},
+  'detailMore': {'zh': '更多信息 →', 'en': 'More info →'},
+  'descLabel': {'zh': '简介', 'en': 'Description'},
+  'spoilerWarn': {'zh': '⚠️ 内容可能会剧透，如果你想看请点击这段话', 'en': '⚠️ This content may contain spoilers. Click this text if you want to see it.'},
+  'patchModeTip': {'zh': '显示匹配游戏的全部官方补丁，含中文的排在前面', 'en': 'Shows all official patches of matched games; Chinese first'},
+  'noResultPatch': {'zh': '没有搜索结果的说，请转到「游戏搜索」里去搜索-喵~', 'en': 'No results found. Please try the "VN Search" mode - meow~'},
+  'noPatches': {'zh': '该游戏暂无官方补丁记录', 'en': 'No official patches on record'},
+  'patchCount': {'zh': '官方补丁 {n} 条', 'en': '{n} patches'},
+  'rateLimit': {'zh': '请求过于频繁，请等几秒再试', 'en': 'Too many requests, please wait a few seconds'},
+  'playtime0': {'zh': '未分类', 'en': 'Unknown'},
+  'playtime1': {'zh': '非常短', 'en': 'Very short'},
+  'playtime2': {'zh': '短', 'en': 'Short'},
+  'playtime3': {'zh': '中等', 'en': 'Medium'},
+  'playtime4': {'zh': '长', 'en': 'Long'},
+  'playtime5': {'zh': '非常长', 'en': 'Very long'},
+  'resultCount': {'zh': '约 {n} 条结果 · {s} 秒', 'en': 'About {n} results · {s}s'},
+  'noCover': {'zh': '无封面', 'en': 'No cover'},
+  'detailBtn': {'zh': '详情', 'en': 'Details'},
+  'browseExpand': {'zh': '展开', 'en': 'Expand'},
+  'browseCollapse': {'zh': '收起', 'en': 'Collapse'},
+  'footer': {'zh': '<a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME 补丁搜索 · 收录 Steam 平台 GALGAME · 补丁仅供学习交流，请支持正版',
+             'en': '<a href="https://www.ciallo.sale" class="copyright-link" target="_blank" rel="noopener">© 2026 DelicateDuck582</a>  GALGAME Patch Search · Steam GALGAME collection · Patches for learning only, please support the official release'}
+};
+
+function t(key) {
+  const m = I18N[key];
+  return m ? (m[lang] || m['zh']) : key;
+}
+
+function langName(code) {
+  const map = {
+    'zh-Hans': 'langShort', 'zh-Hant': 'langTrad', 'en': 'langEn',
+    'ja': 'langJa', 'ko': 'langKo', 'ru': 'langRu', 'es': 'langEs',
+    'id': 'langId', 'vi': 'langVi', 'th': 'langTh', 'fr': 'langFr',
+    'de': 'langDe', 'zh': 'langZh'
+  };
+  const key = map[code];
+  return key ? t(key) : code;
+}
+
+/* ============================================================
+   安全：所有来自 API 的字符串进 innerHTML 前必须转义
+   （文本节点用 escapeHtml；URL / 属性值同样用 escapeHtml 转义引号）
+   ============================================================ */
+function escapeHtml(s) {
+  return String(s === undefined || s === null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* 协议白名单：仅放行 http(s):// 与 mailto:，其余（javascript:/data: 等）一律回退 '#'。
+   cleanDesc 里的调用发生在整体转义之后，URL 已是转义态，故不再二次 escapeHtml。 */
+function safeHref(u) {
+  const s = String(u === undefined || u === null ? '' : u).trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  return '#';
+}
+
+/* 内联 SVG 图标（界面 chrome 不用 emoji） */
+var CHEV_RIGHT = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path d="M3 1.2 L6.8 5 L3 8.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+
+var API_VN = 'https://api.vndb.org/kana/vn';
+var API_RELEASE = 'https://api.vndb.org/kana/release';
+var VN_FIELDS = 'id,title,alttitle,titles{lang,title},developers{name},released,length,rating,votecount,image{url,thumbnail},extlinks{label,url},description';
+var PATCH_FIELDS = 'id,title,alttitle,released,languages{lang},has_ero,freeware,vns{id,title,alttitle,titles{lang,title},developers{name},image{thumbnail}}';
+var SEARCH_TIMEOUT_MS = 15000;
+
+/* ============================================================
+   会社卡片
+   ============================================================ */
+function renderCards() {
+  const grid = document.getElementById('companyGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  COMPANIES.forEach(function(company) {
+    const card = document.createElement('a');
+    card.className = 'company-card';
+    card.href = company.page;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'name';
+    nameEl.textContent = company.name;
+    const countEl = document.createElement('span');
+    countEl.className = 'count mono';
+    countEl.textContent = company.count + ' ' + t('gamesUnit');
+    card.appendChild(nameEl);
+    card.appendChild(countEl);
+    grid.appendChild(card);
+  });
+}
+
+/* ============================================================
+   工具函数
+   ============================================================ */
+function normId(id, prefix) {
+  const s = String(id === undefined || id === null ? '' : id);
+  if (!s) return '';
+  return s.charAt(0) === prefix ? s : prefix + s;
+}
+
+function devNames(devs) {
+  return (devs || []).map(function(d) { return (d && d.name) ? d.name : ''; }).filter(Boolean).join(' / ');
+}
+
+function fmtVotes(n) {
+  if (typeof n !== 'number' || n <= 0) return '';
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+}
+
+/* VNDB Kana API 的 rating 是 0-100（如 82.6），站内与用户习惯是 10 分制 */
+function ratingText(rating, votes) {
+  if (typeof rating !== 'number' || !isFinite(rating)) return '';
+  let s = '★' + (rating / 10).toFixed(2);
+  const v = fmtVotes(votes);
+  if (v) s += ' (' + v + ')';
+  return s;
+}
+
+function playtimeName(n) {
+  const names = [t('playtime0'), t('playtime1'), t('playtime2'), t('playtime3'), t('playtime4'), t('playtime5')];
+  return names[n] !== undefined ? names[n] : '';
+}
+
+/* 标题：日文原题 + 中文别名/副题（en 语言下用英文标题） */
+function vnTitlePair(v) {
+  const titles = (v && v.titles) || [];
+  let ja = '', zh = '', en = '', other = '';
+  titles.forEach(function(x) {
+    if (!x || !x.title) return;
+    if (x.lang === 'ja' && !ja) ja = x.title;
+    else if (x.lang === 'zh-Hans' && !zh) zh = x.title;
+    else if (x.lang === 'zh-Hant' && !zh) zh = x.title;
+    else if (x.lang === 'en' && !en) en = x.title;
+    else if (!other) other = x.title;
+  });
+  const primary = ja || zh || en || other || (v && v.title) || '';
+  let secondary = (lang === 'en') ? (en || zh) : (zh || en);
+  if (!secondary || secondary === primary) secondary = '';
+  return { primary: primary, secondary: secondary };
+}
+
+function vnDisplayTitle(v) {
+  const p = vnTitlePair(v);
+  return p.secondary ? (p.primary + ' / ' + p.secondary) : p.primary;
+}
+
+function isZhLang(code) {
+  return code === 'zh-Hans' || code === 'zh-Hant' || code === 'zh';
+}
+
+function langCodes(rel) {
+  return (rel && rel.languages || []).map(function(l) { return (l && l.lang) ? l.lang : ''; }).filter(Boolean);
+}
+
+function chipsHtml(langs, hasZh) {
+  const seen = {};
+  let out = '';
+  if (hasZh) out += '<span class="chip accent">' + escapeHtml(t('langZh')) + '</span>';
+  (langs || []).forEach(function(code) {
+    if (!code || seen[code]) return;
+    seen[code] = true;
+    out += '<span class="chip">' + escapeHtml(langName(code)) + '</span>';
+  });
+  return out ? '<div class="chips">' + out + '</div>' : '';
+}
+
+function thumbHtml(url, idx) {
+  if (url) {
+    return '<div class="thumb"><img src="' + escapeHtml(url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"></div>';
+  }
+  return '<div class="thumb"><div class="thumb-ph">' + escapeHtml(t('noCover')) + '</div></div>';
+}
+
+/* 标题即跳转链接（不再单独渲染 jumpTo 行） */
+function vndbTitleLink(id, text) {
+  return '<a class="title link-accent" href="' + escapeHtml('https://vndb.org/' + id) + '" target="_blank" rel="noopener">' + escapeHtml(text) + '</a>';
+}
+
+function vndbPatchTitleLink(id, text) {
+  return '<a class="patch-title link-accent" href="' + escapeHtml('https://vndb.org/' + id) + '" target="_blank" rel="noopener">' + escapeHtml(text) + '</a>';
+}
+
+/* ============================================================
+   简介渲染：先整体转义，再还原白名单 BBCode 标签（顺序不可变）
+   ============================================================ */
+function cleanDesc(d) {
+  var s = escapeHtml(d)
+    .replace(/\[url=([^\]]*)\]([\s\S]*?)\[\/url\]/g, function(m, u, text) {
+      return '<a href="' + safeHref(u) + '" target="_blank" rel="noopener">' + text + '</a>';
+    })
+    .replace(/\[url\]([\s\S]*?)\[\/url\]/g, function(m, u) {
+      return '<a href="' + safeHref(u) + '" target="_blank" rel="noopener">' + u + '</a>';
+    })
+    .replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<b>$1</b>')
+    .replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<i>$1</i>')
+    .replace(/\[spoiler\]([\s\S]*?)\[\/spoiler\]/g, '<span class="detail-spoiler" onclick="this.classList.toggle(\'revealed\')"><span class="spoiler-warn">' + escapeHtml(t('spoilerWarn')) + '</span><span class="spoiler-text">$1</span></span>')
+    .replace(/\[quote\]([\s\S]*?)\[\/quote\]/g, '<div class="detail-quote">$1</div>')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n/g, '<br>');
+  return s;
+}
+
+/* ============================================================
+   详情面板（游戏搜索 / VN 分组共用）
+   ============================================================ */
+function detailHtml(v) {
+  let imgHtml = '';
+  if (v.image && v.image.thumbnail) {
+    imgHtml = '<img class="detail-img" src="' + escapeHtml(v.image.thumbnail) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+  }
+  let info = '';
+  const devs = devNames(v.developers);
+  if (devs) info += '<div class="detail-row"><b>' + escapeHtml(t('detailDeveloper')) + '</b> ' + escapeHtml(devs) + '</div>';
+  if (v.released) info += '<div class="detail-row"><b>' + escapeHtml(t('detailReleased')) + '</b> ' + escapeHtml(v.released) + '</div>';
+  if (v.length !== undefined && v.length !== null) {
+    info += '<div class="detail-row"><b>' + escapeHtml(t('detailPlaytime')) + '</b> ' + escapeHtml(playtimeName(v.length)) + '</div>';
+  }
+  const links = (v.extlinks || []).slice(0, 5);
+  if (links.length) {
+    info += '<div class="detail-row"><b>' + escapeHtml(t('detailLinks')) + '</b> ';
+    for (var i = 0; i < links.length; i++) {
+      info += '<a class="detail-link" href="' + escapeHtml(safeHref(links[i] && links[i].url)) + '" target="_blank" rel="noopener">' +
+              escapeHtml((links[i] && (links[i].label || links[i].url)) || '') + '</a>' + (i < links.length - 1 ? ' · ' : '');
+    }
+    info += '</div>';
+  }
+  if (v.description) {
+    info += '<div class="detail-desc-wrap">' +
+      '<div class="detail-desc-head">' +
+        '<span class="detail-desc-label">' + escapeHtml(t('descLabel')) + '</span>' +
+        '<span class="desc-triangle">' + CHEV_RIGHT + '</span>' +
+      '</div>' +
+      '<div class="detail-desc">' + cleanDesc(v.description) + '</div>' +
+    '</div>';
+  }
+  let h = '';
+  if (imgHtml || info) {
+    h += '<div class="detail-flex">' + imgHtml + (info ? '<div class="detail-info">' + info + '</div>' : '') + '</div>';
+  }
+  h += '<a class="detail-more" href="' + escapeHtml('https://vndb.org/' + normId(v.id, 'v')) + '" target="_blank" rel="noopener">' + escapeHtml(t('detailMore')) + '</a>';
+  return h;
+}
+
+/* ============================================================
+   结果行 HTML
+   ============================================================ */
+function vnRowHtml(v, idx) {
+  const vid = normId(v.id, 'v');
+  const pair = vnTitlePair(v);
+  const thumb = (v.image && v.image.thumbnail) ? v.image.thumbnail : '';
+  const meta = [];
+  const devs = devNames(v.developers);
+  if (devs) meta.push(escapeHtml(devs));
+  if (v.released) meta.push(escapeHtml(v.released));
+  if (v.length !== undefined && v.length !== null) meta.push(escapeHtml(playtimeName(v.length)));
+  const rat = ratingText(v.rating, v.votecount);
+  if (rat) meta.push(escapeHtml(rat));
+  return '<article class="row">' +
+    thumbHtml(thumb, idx) +
+    '<div class="row-info">' +
+      '<div class="row-title">' + vndbTitleLink(vid, pair.primary) +
+        (pair.secondary ? '<span class="alt">' + escapeHtml(pair.secondary) + '</span>' : '') +
+      '</div>' +
+      (meta.length ? '<div class="row-meta">' + meta.join(' · ') + '</div>' : '') +
+      '<div class="row-actions">' +
+        '<button type="button" class="btn-ghost btn-sm expand-btn" data-expand="' + escapeHtml(vid) + '" aria-expanded="false" aria-controls="detail-' + escapeHtml(vid) + '" title="' + escapeHtml(t('detailBtn')) + '" aria-label="' + escapeHtml(t('detailBtn')) + '">' + CHEV_RIGHT + '</button>' +
+      '</div>' +
+      '<div class="detail-panel" id="detail-' + escapeHtml(vid) + '">' + detailHtml(v) + '</div>' +
+    '</div>' +
+  '</article>';
+}
+
+/* VN 分组卡：封面 + 标题 + 会社 + 发售日 */
+function groupHtml(g, idx) {
+  const vn = g.info || g.vn || {};
+  const vid = normId(vn.id || (g.vn && g.vn.id), 'v');
+  const pair = vnTitlePair(vn);
+  const thumb = (vn.image && vn.image.thumbnail) ? vn.image.thumbnail : '';
+  const meta = [];
+  const devs = devNames(vn.developers);
+  if (devs) meta.push(escapeHtml(devs));
+  if (vn.released) meta.push(escapeHtml(vn.released));
+  const patches = g.patches || [];
+  if (patches.length) meta.push(escapeHtml(t('patchCount').replace('{n}', String(patches.length))));
+  let inner = '';
+  if (patches.length) {
+    let rows = '';
+    patches.forEach(function(rel) { rows += patchRowHtml(rel); });
+    inner = '<div class="patch-list">' + rows + '</div>';
+  } else {
+    inner = '<p class="no-patch">' + escapeHtml(t('noPatches')) + '</p>';
+  }
+  return '<article class="vn-group">' +
+    '<div class="vn-head">' +
+      thumbHtml(thumb, idx) +
+      '<div class="row-info">' +
+        '<div class="row-title">' + vndbTitleLink(vid, pair.primary) +
+          (pair.secondary ? '<span class="alt">' + escapeHtml(pair.secondary) + '</span>' : '') +
+        '</div>' +
+        (meta.length ? '<div class="row-meta">' + meta.join(' · ') + '</div>' : '') +
+      '</div>' +
+    '</div>' + inner +
+  '</article>';
+}
+
+/* 组内补丁行：标题 + 发售日 + 语言 chips + VNDB 链接 */
+function patchRowHtml(rel) {
+  const rid = normId(rel.id, 'r');
+  const langs = langCodes(rel);
+  const hasZh = langs.some(isZhLang);
+  const date = rel.released ? '<span class="patch-meta">' + escapeHtml(rel.released) + '</span>' : '';
+  return '<div class="patch-row">' +
+    '<div class="patch-line">' +
+      vndbPatchTitleLink(rid, rel.title || '') +
+      date +
+    '</div>' +
+    chipsHtml(langs, hasZh) +
+  '</div>';
+}
+
+/* 兜底：直接搜到的补丁，按结果行展示 */
+function flatPatchRowHtml(rel, idx) {
+  const rid = normId(rel.id, 'r');
+  const langs = langCodes(rel);
+  const hasZh = langs.some(isZhLang);
+  const vnNames = (rel.vns || []).map(function(v) { return vnDisplayTitle(v); }).filter(Boolean).join(' / ');
+  const meta = [];
+  if (rel.released) meta.push(escapeHtml(rel.released));
+  return '<article class="row">' +
+    thumbHtml('', idx) +
+    '<div class="row-info">' +
+      '<div class="row-title">' + vndbPatchTitleLink(rid, rel.title || '') +
+        (vnNames ? '<span class="alt">' + escapeHtml(vnNames) + '</span>' : '') +
+      '</div>' +
+      (meta.length ? '<div class="row-meta">' + meta.join(' · ') + '</div>' : '') +
+      chipsHtml(langs, hasZh) +
+    '</div>' +
+  '</article>';
+}
+
+/* ============================================================
+   详情面板交互：手风琴（单开）+ 简介展开
+   ============================================================ */
+function setupDescToggles(panel) {
+  const wraps = panel.querySelectorAll('.detail-desc-wrap');
+  Array.prototype.forEach.call(wraps, function(wrap) {
+    const desc = wrap.querySelector('.detail-desc');
+    const head = wrap.querySelector('.detail-desc-head');
+    const tri = wrap.querySelector('.desc-triangle');
+    if (!desc || !head || !tri) return;
+    if (desc.scrollHeight > desc.clientHeight + 5) {
+      wrap.classList.add('expandable');
+      head.onclick = function() { wrap.classList.toggle('open'); };
+    }
+  });
+}
+
+function onExpandClick(btn) {
+  const box = document.getElementById('vndbResults');
+  const target = document.getElementById('detail-' + btn.getAttribute('data-expand'));
+  if (!box || !target) return;
+  const opened = box.querySelector('.detail-panel.open');
+  if (opened && opened !== target) {
+    opened.classList.remove('open');
+    const prev = opened.parentNode.querySelector('.expand-btn');
+    if (prev) prev.setAttribute('aria-expanded', 'false');
+  }
+  const isOpen = target.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (isOpen) {
+    requestAnimationFrame(function() { setupDescToggles(target); });
+  }
+}
+
+function bindResults(box) {
+  const btns = box.querySelectorAll('.expand-btn');
+  Array.prototype.forEach.call(btns, function(btn) {
+    btn.addEventListener('click', function() { onExpandClick(btn); });
+  });
+}
+
+/* ============================================================
+   查询后缀清理（循环剥到不动为止）
+   ============================================================ */
+function stripVndbSuffix(s) {
+  let out = String(s === undefined || s === null ? '' : s);
+  let prev;
+  do {
+    prev = out;
+    out = out
+      .replace(/\s*(?:FHD|QHD|HD)\s*Edition$/i, '')
+      .replace(/\s*-\s*FullVoice\s*Edition\s*-?$/i, '')
+      .replace(/\s*Plus\s*(?:FHD\s*)?Edition$/i, '')
+      .replace(/\s*EXTRA\s*1?2?$/i, '')
+      .replace(/\s*Plus$/i, '')
+      .replace(/\s+(?:FHD|QHD|HD)$/i, '')
+      .trim();
+  } while (out !== prev && out !== '');
+  return out;
+}
+
+/* 零结果兜底：取出查询词里第一个全角书名号的内容（如「…《对你说再见》（…）」→「对你说再见」） */
+function extractBracketed(s) {
+  const m = /《([^《》]{1,80})》/.exec(String(s === undefined || s === null ? '' : s));
+  return m ? m[1].trim() : '';
+}
+
+/* ============================================================
+   API：POST JSON + 中止 + 超时 + 429
+   ============================================================ */
+function apiPost(url, body, signal) {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: signal
+  }).then(function(res) {
+    if (res.status === 429) throw new Error('ratelimit');
+    if (!res.ok) throw new Error('http_' + res.status);
+    return res.json();
+  });
+}
+
+let activeRec = null;
+
+function cancelActive() {
+  if (!activeRec) return;
+  activeRec.stale = true;
+  clearTimeout(activeRec.timer);
+  try { activeRec.ctl.abort(); } catch (e) {}
+  activeRec = null;
+}
+
+function beginSearch() {
+  cancelActive();
+  const ctl = new AbortController();
+  const rec = { ctl: ctl, stale: false, timer: 0 };
+  rec.timer = setTimeout(function() {
+    try { ctl.abort(); } catch (e) {}
+  }, SEARCH_TIMEOUT_MS);
+  activeRec = rec;
+  return rec;
+}
+
+function finishSearch(rec) {
+  clearTimeout(rec.timer);
+  if (activeRec === rec) activeRec = null;
+}
+
+/* ============================================================
+   游戏搜索（vn）：1 次 /vn
+   ============================================================ */
+function fetchVn(kw, rec) {
+  return apiPost(API_VN, {
+    filters: ['search', '=', kw],
+    fields: VN_FIELDS,
+    results: 20,
+    count: true
+  }, rec.ctl.signal).then(function(data) {
+    const total = (typeof data.count === 'number' && isFinite(data.count)) ? data.count : null;
+    return { type: 'vn', items: (data.results || []).slice(0, 20), count: total };
+  });
+}
+
+/* ============================================================
+   补丁搜索（patch）：
+   a) 1 次 /vn 拿最多 5 个游戏
+   b) 1 次 /release 拿这些游戏的全部官方补丁（按发售日倒序）
+   c) 按 VN 分组，含中文的补丁排组内最前
+   d) a 步无命中或 b 步 0 结果 → 1 次 /release 直接搜补丁标题
+   e) 整体仍 0 结果且查询词含《》→ 用书名号内容重试整条链路一次（见 runSearch）
+   ============================================================ */
+function fetchFlatPatches(kw, rec) {
+  return apiPost(API_RELEASE, {
+    filters: ['and', ['search', '=', kw], ['patch', '=', true], ['official', '=', true]],
+    fields: PATCH_FIELDS,
+    results: 20
+  }, rec.ctl.signal).then(function(data) {
+    return { type: 'patch', groups: [], flat: (data.results || []).slice(0, 20) };
+  });
+}
+
+function groupPatches(vns, rels) {
+  const order = [];
+  const byId = {};
+  vns.forEach(function(v) {
+    if (!v || !v.id) return;
+    if (!byId[v.id]) {
+      byId[v.id] = { vn: v, info: null, patches: [] };
+      order.push(v.id);
+    }
+  });
+  const seen = {};
+  (rels || []).forEach(function(rel) {
+    if (!rel || !rel.id) return;
+    (rel.vns || []).forEach(function(rv) {
+      const g = (rv && rv.id) ? byId[rv.id] : null;
+      if (!g) return;
+      const key = rel.id + '|' + rv.id;
+      if (seen[key]) return;
+      seen[key] = true;
+      if (!g.info) g.info = rv;
+      g.patches.push(rel);
+    });
+  });
+  order.forEach(function(id) {
+    const g = byId[id];
+    g.patches.sort(function(a, b) {
+      const za = langCodes(a).some(isZhLang) ? 0 : 1;
+      const zb = langCodes(b).some(isZhLang) ? 0 : 1;
+      if (za !== zb) return za - zb;
+      return String(b.released || '').localeCompare(String(a.released || ''));
+    });
+  });
+  return order.map(function(id) { return byId[id]; });
+}
+
+function fetchPatch(kw, rec) {
+  return apiPost(API_VN, {
+    filters: ['search', '=', kw],
+    fields: 'id,title',
+    results: 5
+  }, rec.ctl.signal).then(function(vdata) {
+    const vns = (vdata.results || []).slice(0, 5).filter(function(v) { return v && v.id; });
+    if (!vns.length) return fetchFlatPatches(kw, rec);
+    const orIds = vns.map(function(v) { return ['id', '=', v.id]; });
+    return apiPost(API_RELEASE, {
+      filters: ['and',
+        ['patch', '=', true],
+        ['official', '=', true],
+        ['vn', '=', ['or'].concat(orIds)]
+      ],
+      fields: PATCH_FIELDS,
+      results: 100,
+      sort: 'released',
+      reverse: true
+    }, rec.ctl.signal).then(function(rdata) {
+      const rels = (rdata.results || []).slice(0, 100);
+      if (!rels.length) return fetchFlatPatches(kw, rec);
+      return { type: 'patch', groups: groupPatches(vns, rels), flat: [] };
+    });
+  });
+}
+
+/* ============================================================
+   状态行 / 结果渲染
+   ============================================================ */
+let lastResult = null;
+let lastError = null;
+
+function setStatus(count, sec) {
+  const el = document.getElementById('resultStatus');
+  if (!el) return;
+  if (count === null || count === undefined) { el.textContent = ''; return; }
+  el.textContent = t('resultCount')
+    .replace('{n}', String(count))
+    .replace('{s}', Number(sec || 0).toFixed(2));
+}
+
+function showHint(key) {
+  const box = document.getElementById('vndbResults');
+  if (!box) return;
+  lastError = key;
+  box.innerHTML = '<p class="row-hint">' + escapeHtml(t(key)) + '</p>';
+}
+
+/* 结果条数：vn 模式优先用 Kana API 的 count（真实总数），无 count 时回退渲染条数；
+   patch 模式为 VN 分组数 / 兜底补丁条数 */
+function payloadCount(p) {
+  if (!p) return 0;
+  if (p.type === 'vn') {
+    if (typeof p.count === 'number' && isFinite(p.count)) return p.count;
+    return (p.items || []).length;
+  }
+  return (p.groups || []).length + (p.flat || []).length;
+}
+
+/* 是否没有任何可渲染条目（无结果文案与《》重试以此为准，不看 count） */
+function payloadEmpty(p) {
+  if (!p) return true;
+  if (p.type === 'vn') return (p.items || []).length === 0;
+  return (p.groups || []).length + (p.flat || []).length === 0;
+}
+
+function renderPayload(entry) {
+  const box = document.getElementById('vndbResults');
+  if (!box || !entry) return;
+  const p = entry.payload || {};
+  const count = payloadCount(p);
+  setStatus(count, entry.sec);
+  if (payloadEmpty(p)) {
+    showHint(entry.mode === 'patch' ? 'noResultPatch' : 'noResult');
+    updateClearBtn();
+    return;
+  }
+  lastError = null;
+  let html = '';
+  if (p.type === 'vn') {
+    (p.items || []).forEach(function(v, i) { html += vnRowHtml(v, i); });
+  } else {
+    (p.groups || []).forEach(function(g, i) { html += groupHtml(g, i); });
+    (p.flat || []).forEach(function(r, i) { html += flatPatchRowHtml(r, i); });
+  }
+  box.innerHTML = html;
+  bindResults(box);
+  updateClearBtn();
+}
+
+/* ============================================================
+   搜索入口
+   ============================================================ */
+const searchCache = {};
+let searchMode = 'patch';
+
+function runSearch() {
+  const input = document.getElementById('vndbSearch');
+  const box = document.getElementById('vndbResults');
+  const status = document.getElementById('resultStatus');
+  if (!input || !box) return;
+  const raw = (input.value || '').trim();
+  if (!raw) {
+    cancelActive();  // 清空输入时中止在途请求，避免迟到响应写回
+    if (box) box.innerHTML = '';
+    if (status) status.textContent = '';
+    lastResult = null;
+    lastError = null;
+    updateClearBtn();
+    return;
+  }
+  let kw = stripVndbSuffix(raw);
+  if (!kw) kw = raw;
+  const mode = searchMode;
+  const ck = mode + '|' + kw;
+  if (searchCache[ck]) {
+    cancelActive();  // 缓存命中同样中止在途请求，否则旧结果会覆盖本次渲染
+    lastResult = searchCache[ck];
+    renderPayload(lastResult);
+    return;
+  }
+  lastError = null;
+  if (status) status.textContent = t('searching');
+  box.innerHTML = '<p class="row-hint">' + escapeHtml(t('searching')) + '</p>';
+  const rec = beginSearch();
+  const t0 = performance.now();
+  const runChain = function(k) { return (mode === 'vn') ? fetchVn(k, rec) : fetchPatch(k, rec); };
+  const settle = function(payload) {
+    const sec = (performance.now() - t0) / 1000;
+    finishSearch(rec);
+    if (rec.stale) return;
+    const entry = { mode: mode, kw: kw, payload: payload, sec: sec };
+    searchCache[ck] = entry;
+    lastResult = entry;
+    renderPayload(entry);
+  };
+  runChain(kw).then(function(payload) {
+    if (rec.stale) return;
+    // 零结果兜底：查询词含《》且内容不同时，用书名号里的内容重试一次完整链路
+    // （重试耗时计入状态行；缓存键始终是原始查询词 kw）
+    const alt = payloadEmpty(payload) ? extractBracketed(kw) : '';
+    if (alt && alt !== kw) {
+      return runChain(alt).then(function(retryPayload) { settle(retryPayload); });
+    }
+    settle(payload);
+  }).catch(function(err) {
+    finishSearch(rec);
+    if (rec.stale) return;
+    if (status) status.textContent = '';
+    showHint((err && err.message === 'ratelimit') ? 'rateLimit' : 'searchFail');
+    updateClearBtn();
+  });
+}
+
+function clearSearch() {
+  const input = document.getElementById('vndbSearch');
+  const box = document.getElementById('vndbResults');
+  const status = document.getElementById('resultStatus');
+  cancelActive();
+  if (input) input.value = '';
+  if (box) box.innerHTML = '';
+  if (status) status.textContent = '';
+  lastResult = null;
+  lastError = null;
+  updateClearBtn();
+}
+
+function updateClearBtn() {
+  const input = document.getElementById('vndbSearch');
+  const btn = document.getElementById('vndbClearBtn');
+  if (!btn) return;
+  const hasInput = !!(input && (input.value || '').trim());
+  btn.disabled = !hasInput && !lastResult;
+}
+
+function setMode(mode, rerun) {
+  searchMode = (mode === 'vn') ? 'vn' : 'patch';
+  const mp = document.getElementById('modePatch');
+  const mv = document.getElementById('modeVn');
+  if (mp) mp.setAttribute('aria-pressed', searchMode === 'patch' ? 'true' : 'false');
+  if (mv) mv.setAttribute('aria-pressed', searchMode === 'vn' ? 'true' : 'false');
+  const tip = document.getElementById('patchModeTip');
+  if (tip) tip.style.display = (searchMode === 'patch') ? '' : 'none';
+  if (!rerun) return;
+  const input = document.getElementById('vndbSearch');
+  if (input && (input.value || '').trim()) runSearch();
+  else clearSearch();
+}
+
+/* ============================================================
+   玩过的GAL 折叠区
+   ============================================================ */
+let browseOpen = false;
+
+function setBrowse(open) {
+  browseOpen = !!open;
+  const body = document.getElementById('browseBody');
+  const btn = document.getElementById('browseToggle');
+  if (body) body.classList.toggle('open', browseOpen);
+  if (btn) {
+    btn.textContent = browseOpen ? t('browseCollapse') : t('browseExpand');
+    btn.setAttribute('aria-expanded', browseOpen ? 'true' : 'false');
+  }
+}
+
+/* ============================================================
+   语言切换
+   ============================================================ */
+function setLang() {
+  document.documentElement.lang = (lang === 'en') ? 'en' : 'zh-CN';
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el) {
+    el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph')));
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(function(el) {
+    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach(function(el) {
+    el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria')));
+  });
+  const lt = document.getElementById('langToggle');
+  if (lt) lt.textContent = (lang === 'en') ? '中文' : 'EN';
+  setBrowse(browseOpen);
+  renderCards();
+  if (lastResult) renderPayload(lastResult);
+  else if (lastError) showHint(lastError);
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+(function initSearch() {
+  const form = document.getElementById('searchForm');
+  const input = document.getElementById('vndbSearch');
+  const clearBtn = document.getElementById('vndbClearBtn');
+  const mp = document.getElementById('modePatch');
+  const mv = document.getElementById('modeVn');
+  if (form) form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    runSearch();
+  });
+  if (input) {
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } });
+    input.addEventListener('input', updateClearBtn);
+  }
+  if (clearBtn) clearBtn.addEventListener('click', clearSearch);
+  if (mp) mp.addEventListener('click', function() { if (searchMode !== 'patch') setMode('patch', true); });
+  if (mv) mv.addEventListener('click', function() { if (searchMode !== 'vn') setMode('vn', true); });
+  setMode('patch', false);
+  updateClearBtn();
+})();
+
+(function initLang() {
+  const btn = document.getElementById('langToggle');
+  if (btn) btn.addEventListener('click', function() {
+    lang = (lang === 'zh') ? 'en' : 'zh';
+    try { localStorage.setItem('vndb_lang', lang); } catch (e) {}
+    setLang();
+  });
+  setLang();
+})();
+
+(function initBrowse() {
+  const toggle = document.getElementById('browseToggle');
+  if (toggle) toggle.addEventListener('click', function() { setBrowse(!browseOpen); });
+  setBrowse(false);
+})();
+</script>
+</body>
+</html>
