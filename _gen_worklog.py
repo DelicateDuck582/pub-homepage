@@ -1169,6 +1169,7 @@ FILTER_JS = """
         }
 
         function show(el, ev, hold) {
+          if (!tip.isConnected) document.body.appendChild(tip);   /* 页面自我换新会替换整个文档，旧卡片节点被甩出 DOM 后在这里重挂 */
           target = el;
           var text = el.getAttribute('data-tip') || '';
           tip.textContent = text;
@@ -1209,7 +1210,7 @@ FILTER_JS = """
           var el = toEl(ev.target);      /* 触屏没有 hover，点一下显示 2.6 秒 */
           if (el) show(el, ev, true); else hide();
         });
-        window.addEventListener('scroll', hide, { passive: true });
+        window.addEventListener('scroll', hide, { passive: true, capture: true });   /* capture：热力图等容器自身的滚动也会让内容移出指针下方，一并收掉 */
         window.addEventListener('resize', hide, { passive: true });
       })();
 

@@ -16,3 +16,8 @@ _*.png
 _page-dbg.html
 _wl-delta-test-*.html
 __pycache__/
+
+# 本地工具状态目录（Mimosa 门禁 / Wrangler / ZCode 会话产物）：不进仓库
+.mimosa/
+.wrangler/
+.zcode/
