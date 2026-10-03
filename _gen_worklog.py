@@ -919,7 +919,7 @@ overview_cards = [
     ("", total_branches, "个", "涉及分支（含主线）"),
     ("", span_days, "天", "跨度 %s → %s" % (span_first[5:], span_last[5:])),
     ("", file_touches, "次", "文件改动（同文件多次计数）"),
-    ("", repo_commits, "条", "两仓库分支提交总量"),
+    ("", repo_commits, "条", "全部仓库分支提交总量"),
 ]
 stats_html = "".join(
     '<div class="stat %s"><div class="stat-num">%s<span class="unit">%s</span></div>'
@@ -1007,6 +1007,7 @@ def html_filters(repos):
 
 timeline_html, timeline_total = html_timeline(repos)
 REPO_SUB = "、".join(r["key"] for r in repos)
+REPO_NCN = {1: "一", 2: "两", 3: "三", 4: "四", 5: "五"}.get(len(repos), str(len(repos)))   # 仓库数的中文写法
 
 CSS_C = """
   /* 分支拓扑图例：只留「线条怎么画」，圆点含义走一句话说明，不再一项一个图形 */
@@ -1884,13 +1885,13 @@ MAIN_TMPL = """
     <!-- 1. 首屏 -->
     <section class="hero">
       <h1 class="hero-title">工作日志</h1>
-      <p class="section-desc">fork 只是起点，重新定义才是目的。这里是我在 __REPOS__ 两个仓库<strong>所有分支</strong>里由自己提交的全部改动，共 <strong>__MINE__ 条</strong>，数据由 git 历史自动生成。</p>
+      <p class="section-desc">fork 只是起点，重新定义才是目的。这里是我在 __REPOS__ __NCN__个仓库<strong>所有分支</strong>里由自己提交的全部改动，共 <strong>__MINE__ 条</strong>，数据由 git 历史自动生成。</p>
       <div class="btn-row">
         <a class="btn btn-primary" href="https://github.com/DelicateDuck582" target="_blank" rel="noopener">__I_GIT__<span>我的 GitHub</span></a>
         <a class="btn btn-outline" href="#timeline"><span>看提交记录</span>__I_ARROW__</a>
         <a class="btn btn-outline" href="index.html">__I_BACK__<span>返回首页</span></a>
       </div>
-      <p class="hero-note">说明：这里的数字只算<strong>我署名</strong>的提交（__REPOS__ 两个仓库、所有分支），别人提交的、从上游带过来的、以及被时间线筛选挡住的都不显示，所以 GitHub 上能看到的提交会比这里多一些。</p>
+      <p class="hero-note">说明：这里的数字只算<strong>我署名</strong>的提交（__REPOS__ __NCN__个仓库、所有分支），别人提交的、从上游带过来的、以及被时间线筛选挡住的都不显示，所以 GitHub 上能看到的提交会比这里多一些。</p>
     </section>
 
     <!-- 2. 总览 -->
@@ -1957,6 +1958,7 @@ def build_main():
              '<path d="M4.5 12h14"/><path d="m13 6.5 5.5 5.5L13 17.5"/></svg>')
     for token, value in (
         ("__REPOS__", esc(REPO_SUB)),
+        ("__NCN__", REPO_NCN),
         ("__MINE__", str(total_mine)),
         ("__SPAN__", "%s → %s" % (span_first, span_last)),
         ("__DAYS__", str(len(all_days))),
@@ -1991,7 +1993,7 @@ main_html = build_main()
 tpl = open(INDEX, encoding="utf-8").read()
 tpl = tpl.replace("<title>首页 | DelicateDuck582</title>", "<title>工作日志 | DelicateDuck582</title>")
 tpl = tpl.replace('<meta name="description" content="DelicateDuck582 的个人主页">',
-                  '<meta name="description" content="DelicateDuck582 的工作日志：cloud-mail 与 SPlayer 全部分支的提交记录">')
+                  '<meta name="description" content="DelicateDuck582 的工作日志：' + REPO_SUB + ' 全部分支的提交记录">')
 tpl = embed_font(tpl.replace("</style>", CSS_A + CSS_B + CSS_C + "\n</style>", 1))
 tpl = tpl.replace('<a href="#home">首页</a>', '<a href="index.html">首页</a>')
 tpl = tpl.replace('<span class="current">DelicateDuck582</span>', '<span class="current">工作日志</span>')

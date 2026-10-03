@@ -17,8 +17,13 @@ REPOS = [
          url="https://github.com/DelicateDuck582/cloud-mail"),
     dict(key="SPlayer", repo=os.path.join(WORK, "SPlayer.git"), main="dev",
          url="https://github.com/DelicateDuck582/SPlayer"),
+    dict(key="ciyuan-translate", repo=os.path.join(WORK, "ciyuan-translate.git"), main="main",
+         url="https://github.com/lolicon-daisuki/ciyuan-translate",
+         # 纯数字标题是占位提交，不计数；提交按全局署名规则计入
+         ignore_numeric=True),
 ]
-ME_EMAILS = {"105136492+DelicateDuck582@users.noreply.github.com", "2708857263@qq.com"}
+ME_EMAILS = {"105136492+DelicateDuck582@users.noreply.github.com", "2708857263@qq.com",
+             "132802091+ahappyduck@users.noreply.github.com"}
 FS, RS = "\x1f", "\x1e"          # 字段分隔 / 记录分隔
 
 # 写法别名 → 统一类型（约定式提交里常见的各种写法，都被收敛到同一批分类）
@@ -87,7 +92,9 @@ def merged_by_merge(repo, target, sha):
     return False
 
 
-def is_me(name, email):
+def is_me(name, email, authors=None):
+    if authors is not None:                       # 仓库指定了署名身份时只认这些邮箱（大小写不敏感）
+        return (email or "").lower() in {a.lower() for a in authors}
     return ("DelicateDuck" in (name or "")) or ("DelicateDuck" in (email or "")) or (email in ME_EMAILS)
 
 
@@ -141,7 +148,9 @@ for cfg in REPOS:
                 continue
             sha, short, an, ae, date, parents, subject = parts[:7]
             total += 1
-            if not is_me(an, ae):
+            if cfg.get("ignore_numeric") and re.fullmatch(r"\d+", subject.strip() or ""):
+                continue                          # 纯数字标题是占位提交，不签收也不计数
+            if not is_me(an, ae, cfg.get("authors")):
                 continue
             mine += 1
             c = commits.get(sha)
@@ -199,7 +208,8 @@ for cfg in REPOS:
                 break
 
     # 这些提交改动了哪些文件（--author 过滤在 git 端完成，避免对整个历史做 tree diff）
-    files_raw = git(repo, "log", "--all", "--author=DelicateDuck",
+    files_author = "ahappyduck" if cfg.get("authors") else "DelicateDuck"
+    files_raw = git(repo, "log", "--all", "--author=" + files_author,
                     "--pretty=format:" + RS + "%H", "--name-only")
     filemap = collections.defaultdict(list)
     cur = None
