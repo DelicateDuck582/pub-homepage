@@ -7,7 +7,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File _daily_update.ps1 -Publish -Api https://worklog-collector.xxx.workers.dev -PublishToken 口令
 
   流程：
-    1) 对 cloud-mail.git / SPlayer.git 执行 git fetch --all --prune（只拉提交图，不拉文件内容）
+    1) 对 cloud-mail.git / SPlayer.git / ciyuan-translate.git 执行 git fetch --all --prune（只拉提交图，不拉文件内容）
     2) 跑 _collect.py 重新采集（含真实父子分支关系、提交类型判定）
     2.5) 带 -Api 时顺路让 Worker 逐条判定提交类型，并取回 worklog-kinds.json（取不到就忽略，页面照旧）
     3) 采集结果有变化才跑 _gen_worklog.py + _pack_site.py 重新生成页面与 dist.zip
@@ -54,8 +54,8 @@ Write-Log '=== 工作日志每日更新：开始 ==='
 try {
   $PY = Get-PythonPath
 
-  # 1) 拉取两个源仓库的最新提交图
-  foreach ($bare in @('cloud-mail.git', 'SPlayer.git')) {
+  # 1) 拉取三个源仓库的最新提交图
+  foreach ($bare in @('cloud-mail.git', 'SPlayer.git', 'ciyuan-translate.git')) {
     $repo = Join-Path $WORK $bare
     if (-not (Test-Path $repo)) { Write-Log "跳过 $bare（目录不存在，需先 --bare --filter=blob:none 克隆）"; continue }
     git -C $repo fetch --all --prune --quiet 2>&1 | Out-Null

@@ -15,7 +15,7 @@
 #      放法：Settings → Secrets and variables → Actions 里的「Secret」或「Variable」都读得到；
 #      若放进 Environments，则要在下面的 job 上补一行 `environment: 环境名` 才读得到
 #      （并且别给那个环境配「必需审查者 / 等待计时器」，否则每天会被卡住等审批）。
-#   3) SRC_TOKEN 可选：只读两个源仓库的 token；源仓库是公开的，不配也能跑（只是容易被限流）
+#   3) SRC_TOKEN 可选：只读三个源仓库的 token；源仓库是公开的，不配也能跑（只是容易被限流）
 name: worklog
 
 on:
@@ -39,7 +39,7 @@ jobs:
       - name: 取出站点仓库
         uses: actions/checkout@v4
 
-      - name: 拉两个源仓库的提交图（只取提交元数据，很快）
+      - name: 拉三个源仓库的提交图（只取提交元数据，很快）
         env:
           SRC_TOKEN: ${{ vars.SRC_TOKEN || secrets.SRC_TOKEN }}
         run: |
@@ -47,6 +47,7 @@ jobs:
           if [ -n "$SRC_TOKEN" ]; then auth="x-access-token:${SRC_TOKEN}@"; fi    # 公开仓库可以不带 token
           git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/cloud-mail.git" cloud-mail.git
           git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/SPlayer.git" SPlayer.git
+          git clone --bare --filter=blob:none "https://github.com/lolicon-daisuki/ciyuan-translate.git" ciyuan-translate.git
 
       - name: 采集（原始时区、改动目录、分支分叉关系都算在本地这套口径里）
         run: python _collect.py

@@ -7,13 +7,13 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主页 |
-| `worklog.html` | 工作日志：把 cloud-mail 与 SPlayer 两个仓库（**所有分支**）里由我署名的提交，整理成统计卡、提交类型、热力图、分支拓扑和时间线。**自动生成，别手改。** |
+| `worklog.html` | 工作日志：把 cloud-mail、SPlayer 与 ciyuan-translate 三个仓库（**所有分支**）里由我署名的提交，整理成统计卡、提交类型、热力图、分支拓扑和时间线。**自动生成，别手改。** |
 | `提交类型规范.md` | 工作日志里「提交类型」的判定口径 |
 | `favicon.*` `apple-touch-icon.png` `logo.png` | 图标与 logo |
 
 ## 工作日志怎么来的
 
-1. `_collect.py`：用 git 拉两个仓库的提交图（`--filter=blob:none` 的裸库，只取提交元数据，很快），
+1. `_collect.py`：用 git 拉三个仓库的提交图（`--filter=blob:none` 的裸库，只取提交元数据，很快），
    算出分支树、分叉/并回关系、每个提交的类型与改动目录，写出 `worklog-data.json`；
 2. `_gen_worklog.py`：把数据渲染成自包含的 `worklog.html`（字体、图标、样式全部内联，无外部请求）；
 3. `_cf_worker_worklog.js`：一个 Cloudflare Worker + KV，负责在云端也维护同一份数据：
@@ -23,7 +23,7 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
    - 把时间线快照存进 KV，并开 `GET /timeline.json?since=<ISO>` 给页面取增量。
 
 4. `.github/workflows/worklog.yml`：每天 21:40（北京）在 **GitHub Actions** 里把整页重渲染一遍 ——
-   拉两个仓库的提交图、跑上面两个脚本、把新的 `worklog.html` 提交回仓库，并推给 Worker。
+   拉三个仓库的提交图、跑上面两个脚本、把新的 `worklog.html` 提交回仓库，并推给 Worker。
    所以**提交节奏、分支拓扑、分支明细、提交时间线四处图表每天都会自己更新，跟你的电脑开不开机无关**；
    Worker 一发现数据有变化，还会立刻发一次 `repository_dispatch`，让这一步当天就近实时跑完。
 
@@ -34,9 +34,10 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
 ## 本地跑
 
 ```powershell
-# 1) 准备两个裸库（放在本目录下，脚本按这个名字找）
+# 1) 准备三个裸库（放在本目录下，脚本按这个名字找）
 git clone --bare --filter=blob:none https://github.com/DelicateDuck582/cloud-mail.git cloud-mail.git
 git clone --bare --filter=blob:none https://github.com/DelicateDuck582/SPlayer.git SPlayer.git
+git clone --bare --filter=blob:none https://github.com/lolicon-daisuki/ciyuan-translate.git ciyuan-translate.git
 
 # 2) 采集 + 渲染
 python _collect.py         # 写出 worklog-data.json
