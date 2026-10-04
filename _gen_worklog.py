@@ -420,11 +420,18 @@ def topo_lanes(branches, root):
 
 WINDOW_DAYS = 62        # 拓扑图只画最近这么多天（约两个月），更早的提交折叠成泳道最左边的小圆点
 
+SHARED_WIN = None       # 三张拓扑图共用的时间轴窗口：组装页面前由 build_shared_window() 算一次，
+                        # 之后所有 graph_window() 都复用它 —— 各算各的会让三张图的横轴刻度对不上
 
-def graph_window(repo):
-    """拓扑图横轴窗口：只画最近 WINDOW_DAYS 天，更早的历史折叠到最左边（「更早已经折叠 ↦」）。
+
+def branch_days(repo):
+    """一个仓库里出现过的所有日期（各分支的分叉/HEAD/首末提交），用来算时间轴窗口。"""
+    return [b[k][:10] for b in repo["branches"] for k in ("fork_date", "head_date", "first", "last") if b.get(k)]
+
+
+def window_from_days(days):
+    """窗口公式（只留这一份）：只画最近 WINDOW_DAYS 天，跨度不够就全展，更早的历史折叠到最左边。
     返回 dict(x0=起点序数, win0=起点日期, x1=终点序数, x0_full=真实最早的一天)，没数据时返回 None。"""
-    days = [b[k][:10] for b in repo["branches"] for k in ("fork_date", "head_date", "first", "last") if b.get(k)]
     if not days:
         return None
     x0_full, x1_full = dnum(min(days)), dnum(max(days))
@@ -433,6 +440,21 @@ def graph_window(repo):
     x0 = x0_full if (x1_full - x0_full) <= WINDOW_DAYS else x1_full - WINDOW_DAYS
     x1 = int(round(x1_full + max(3, (x1_full - x0) * 0.09)))    # 右侧留白：曲线要落到子泳道、末尾圆点也要有地方站
     return dict(x0=x0, win0=from_ord(int(round(x0))).isoformat(), x1=x1, x0_full=x0_full)
+
+
+def build_shared_window(repo_list):
+    """组装页面前调用一次：把所有仓库的日期合到一起算一个窗口，三张图共用。"""
+    global SHARED_WIN
+    SHARED_WIN = window_from_days([d for r in repo_list for d in branch_days(r)])
+    return SHARED_WIN
+
+
+def graph_window(repo):
+    """某张拓扑图的横轴窗口：优先用全局共享窗口（三张图刻度必须一致）；
+    共享窗口还没算过时（比如单独调用本函数），退回按该仓库自己的数据算。"""
+    if SHARED_WIN:
+        return SHARED_WIN
+    return window_from_days(branch_days(repo))
 
 
 def my_shas(repo):
@@ -471,6 +493,10 @@ def upstream_split(repo):
     if not root.get("first"):
         return dict(lane=root["name"], day="", mine=0, total=root["commits_total"])
     if root["first"] <= win["win0"]:
+        return None
+    # 主线上我的首个提交之前没有任何更早的提交（自建的新仓库）→ 不存在「上游时代」，不画紫色段；
+    # first_any 字段缺失（旧数据 / 单独调用兜底）时保持现行为。
+    if root.get("first_any") and root.get("first") and root["first_any"] >= root["first"][:10]:
         return None
     return dict(lane=root["name"], day=root["first"],
                 mine=root["commits_mine"], total=root["commits_total"])
@@ -527,7 +553,11 @@ def svg_branch_graph(repo, width=920):
                    % (x, pad_t - 14, x, base_y))
         out.append('<text class="g-axis-label" x="%.0f" y="%d" text-anchor="%s">%s</text>'
                    % (x, base_y + 20, anchor, axis_label(d)))
-    if x0 > x0_full:                               # 有被折叠的历史，左侧标一下
+    # 「更早已经折叠 ↦」只在本仓库真的有窗口外的历史时才标：x0 > x0_full 只说明窗口被截断过，
+    # 而共享窗口下 x0_full 是所有仓库里最早的一天，还要看本仓库自己最早的一天是否早于 win0。
+    own_days = branch_days(repo)
+    own_x0_full = dnum(min(own_days)) if own_days else x0_full
+    if x0 > x0_full and own_x0_full < dnum(win0):
         out.append('<text class="g-axis-label" x="%d" y="%d" text-anchor="start">更早已经折叠 ↦</text>'
                    % (pad_l, pad_t - 16))
 
@@ -949,6 +979,10 @@ def graph_legend(repo):
     chips.append('<span class="lg-hint">← 手机上可左右滑动</span>')
     return '<div class="g-legend">%s</div>' % "".join(chips)
 
+
+# 先算好全局共享窗口再拼拓扑图：svg_branch_graph() 内部会经 graph_window()/upstream_split()
+# 读窗口，必须在这之前定下来，否则三张图的横轴还是各算各的
+build_shared_window(repos)
 
 graph_cards = "".join(
     '<div class="chart-card">'

@@ -139,6 +139,7 @@ for cfg in REPOS:
         raw = git(repo, "log", br, "--pretty=format:%H" + FS + "%h" + FS + "%an" + FS + "%ae" + FS
                   + "%aI" + FS + "%P" + FS + "%s" + RS)
         mine, total = 0, 0
+        last_any_date = ""                       # 该分支最早的提交日期：log 按新→旧遍历，循环结束后它就是最早那条
         for rec in raw.split(RS):
             rec = rec.strip("\n")
             if not rec:
@@ -147,6 +148,7 @@ for cfg in REPOS:
             if len(parts) < 7:
                 continue
             sha, short, an, ae, date, parents, subject = parts[:7]
+            last_any_date = date[:10]
             total += 1
             if cfg.get("ignore_numeric") and re.fullmatch(r"\d+", subject.strip() or ""):
                 continue                          # 纯数字标题是占位提交，不签收也不计数
@@ -165,6 +167,8 @@ for cfg in REPOS:
                                 head_date=git(repo, "log", "-1", "--format=%aI", br).strip()[:10],
                                 commits_total=total, commits_mine=mine,
                                 parent="", fork_point="", fork_date="", merged_into="", merged_kind="",
+                                # 该分支最早的提交（不分作者），用于判断主线上我之前是否存在真实的上游时代
+                                first_any=last_any_date,
                                 first=days[0] if days else "", last=days[-1] if days else "",
                                 span=(days[-1][:4] + "-" + days[-1][5:7]) if days else ""))
 
