@@ -21,6 +21,13 @@ API_BASE = os.environ.get("WORKLOG_API") or "https://api-www.delicateduck.xyz"
 # 站点仓库（owner/repo）：提示条里的「现在就去重建整页」指向它的 Actions；留空就不显示这个链接
 REPO_SLUG = os.environ.get("WORKLOG_REPO") or "DelicateDuck582/pub-homepage"
 BUILD_AT = datetime.datetime.now().astimezone().isoformat(timespec="seconds")   # 本页构建时间，用于和 Worker 的采集时间比对
+# 时间线默认「自动加载」：所有年份的提交一条 DOM 都不内嵌，只在时间线里按年留一行「年份归档行」，
+# 页面打开后前端自动从 Worker 的 KV 按年（新 → 旧）拉回来现渲染 —— 页面体积只跟统计 / 图表有关。
+# 显式设置 WORKLOG_BUILD_YEAR 时回到「分档」模式（那一年整块内嵌、其余年份点行加载）：
+# 自测用，也是「2027 起自动分档」提前铺好的开关。
+BUILD_YEAR_ENV = (os.environ.get("WORKLOG_BUILD_YEAR") or "").strip()
+BUILD_YEAR = str(int(BUILD_YEAR_ENV or BUILD_AT[:4]))
+TIMELINE_AUTO = not BUILD_YEAR_ENV
 DATA = os.path.join(HERE, "worklog-data.json")
 FONT_FILE = os.path.join(HERE, "inter-var.woff2")
 INDEX = os.path.join(SITE, "index.html")
@@ -214,11 +221,13 @@ CSS_A = """
   .g-lane-main { stroke: var(--accent); stroke-width: 2.8; }   /* 主分支（图的根） */
   /* 上游（原作者）的部分单独走一个色系：主线里「我接手之前」的那一截、以及从上游提交分出的分叉线。
      这两条必须排在 .g-lane-main / .g-fork 后面，才能盖掉主色 */
-  :root { --up: #949cf5; }
+  :root { --up: #82a3cb; }
   .g-lane-up { stroke: var(--up); stroke-width: 2.4; }
-  /* 整张拓扑图只有三种符号：泳道线、提交圆点、HEAD 空心圆（外加窗口外的折叠点） */
+  /* 整张拓扑图只有三种符号：泳道线、提交圆点、HEAD 空心圆（外加窗口外的折叠点和移植连线） */
   .g-fork { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 4 3; opacity: 0.85; fill: none; }
   .g-fork-up { stroke: var(--up); }                            /* 分叉点落在上游的提交上 */
+  /* 移植连线：从来源泳道那条线弯到该提交的圆点，点状虚线（和分叉的 4 3 段虚线区分开） */
+  .g-port { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 1.5 3; stroke-linecap: round; fill: none; opacity: .9; }
   .g-node { fill: var(--accent); }
   .g-node-past { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 2 1.6; opacity: 0.9; }   /* 窗口外的提交折叠点 */
   .g-node-head { fill: var(--bg); stroke: var(--accent); stroke-width: 2.2; }
@@ -298,19 +307,19 @@ CSS_B = """
   .kind-val { font-size: 12.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
   .kd { display: inline-block; border-radius: 50%; }
   .kind-name .kd { width: 7px; height: 7px; }
-  .kd-feat { background: #38bdf8; }
-  .kd-fix { background: #34d399; }
-  .kd-refactor { background: #a78bfa; }
-  .kd-merge { background: #e879f9; }
-  .kd-docs { background: #facc15; }
-  .kd-chore { background: #9ca3af; }
-  .kd-style { background: #f472b6; }
-  .kd-perf { background: #2dd4bf; }
-  .kd-test { background: #a3e635; }
-  .kd-build { background: #fb923c; }
-  .kd-ci { background: #60a5fa; }
-  .kd-revert { background: #f87171; }
-  .kd-other { background: #71717a; }
+  .kd-feat { background: #cc785c; }
+  .kd-fix { background: #6f9f7d; }
+  .kd-refactor { background: #7d8fbf; }
+  .kd-merge { background: #a98bc0; }
+  .kd-docs { background: #c2a25a; }
+  .kd-chore { background: #8f8e86; }
+  .kd-style { background: #b98fa8; }
+  .kd-perf { background: #5f9fa8; }
+  .kd-test { background: #7fa87f; }
+  .kd-build { background: #a08f6f; }
+  .kd-ci { background: #8fa0b8; }
+  .kd-revert { background: #b07d78; }
+  .kd-other { background: #8b8a83; }
 
   /* 筛选 */
   .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -479,6 +488,38 @@ def fork_stats(repo):
     return out
 
 
+def own_lane(c, idx, parent_of, fork_of):
+    """同一提交会出现在多条包含它的分支里，归给拓扑上最深、真正提交它的那条。"""
+    names = [n for n in c["branches"] if n in idx]
+    cands = [n for n in names if parent_of.get(n) not in names]
+    if not cands:
+        return names[0] if names else ""
+    cands.sort(key=lambda n: fork_of.get(n, ""), reverse=True)
+    return cands[0]
+
+
+def port_records(repo):
+    """提交信息里声明「从 X 分支选择性移植」的提交 → [(所在泳道, 来源分支, 提交日期)]。
+
+    git 层面对这类提交推不出拓扑（和来源分支没有父子关系），来源只能靠提交信息自述；
+    来源分支必须是真实存在的泳道、且不是提交自己所在的泳道，否则这条连线不认。"""
+    lanes = topo_lanes(repo["branches"], repo["main"])
+    if not lanes:
+        return []
+    idx = {b["name"]: i for i, b in enumerate(lanes)}
+    parent_of = {b["name"]: (b.get("parent") or "") for b in lanes}
+    fork_of = {b["name"]: (b.get("fork_date") or "")[:10] for b in lanes}
+    recs = []
+    for c in repo["commits"]:
+        src = (c.get("port_from") or "").strip()
+        if not src or src not in idx:
+            continue
+        lane = own_lane(c, idx, parent_of, fork_of)
+        if lane and lane != src:
+            recs.append((lane, src, c["day"]))
+    return recs
+
+
 def upstream_split(repo):
     """主线（图的根）上「我接手之前」的那一截 —— 也就是上游作者的 main。
 
@@ -506,6 +547,7 @@ def svg_branch_graph(repo, width=920):
     """分支拓扑：x 轴是时间、y 轴是分支泳道。父子关系取自 git merge-base。
     整张图只有三种符号：圆点 = 我当天在该分支的提交（同一天只画一颗，越大说明当天越多）、
     空心圆 = 分支 HEAD、虚线曲线 = 这条分支从父分支的哪个提交分出来。
+    另有点状虚线 = 从别的分支选择性移植过来的提交（git 上推不出拓扑，靠提交信息里的自述）。
     颜色分两层：主色 = 我的部分；另一个色系（--up）= 上游作者的部分（主线里我接手前的那一截、
     以及分叉点落在上游提交上的曲线）。"""
     lanes = topo_lanes(repo["branches"], repo["main"])
@@ -565,13 +607,8 @@ def svg_branch_graph(repo, width=920):
     fork_of = {b["name"]: (b.get("fork_date") or "")[:10] for b in lanes}
 
     def own_branch(c):
-        """同一提交会出现在多条包含它的分支里，归给拓扑上最深、真正提交它的那条。"""
-        names = [n for n in c["branches"] if n in idx]
-        cands = [n for n in names if parent_of.get(n) not in names]
-        if not cands:
-            return names[0] if names else ""
-        cands.sort(key=lambda n: fork_of.get(n, ""), reverse=True)
-        return cands[0]
+        """同一提交归给拓扑上最深、真正提交它的那条泳道（与 port_records() 同一份判定）。"""
+        return own_lane(c, idx, parent_of, fork_of)
 
     # 我的提交按「天」聚合到它真正所在的分支（同一天多条只画一颗，半径随数量增大）
     per_day = collections.defaultdict(collections.Counter)
@@ -643,6 +680,42 @@ def svg_branch_graph(repo, width=920):
         laid[name] = layout([(x, max(1.2, r * s), t, p) if t in TAGS_MINE else (x, r, t, p)
                              for x, r, t, p in items])
 
+    # ---- 第一遍半：移植连线要的东西 —— 每条泳道线的左右端点、每天的圆点 x、来源泳道计数 ----
+    lanes_span, day_x, past_x = {}, {}, {}
+    for b in lanes:
+        name = b["name"]
+        xs = [x for x, _r, _t, _p in laid[name]]
+        lo, hi = min(xs), max(xs)
+        if up and name == up["lane"] and (hi if not up["day"] else min(lo, max(pad_l, px(up["day"])))) > pad_l + 0.5:
+            lo = pad_l                             # 主线左端是上游段时，线从窗口左界起
+        lanes_span[name] = (lo, hi)
+        # 窗口内的提交点按天排布（layout 只做整体平移 / 向右推），与排序后的日期一一对应
+        in_win = [d for d, _n in sorted(per_day.get(name, {}).items()) if d >= win0]
+        dots = [it for it in laid[name] if it[2] == "dot"]
+        day_x[name] = {d: it[0] for d, it in zip(in_win, dots)}
+        folded = [it for it in laid[name] if it[2] == "past"]
+        past_x[name] = folded[0][0] if folded else None
+
+    port_lines, port_by_lane = [], collections.defaultdict(collections.Counter)
+    for lane, src, day in port_records(repo):
+        x = day_x.get(lane, {}).get(day)
+        if x is None:                              # 窗口外的提交：连到本泳道最左边的折叠点
+            x = past_x.get(lane)
+        if x is None:
+            continue
+        lo, hi = lanes_span[src]
+        sx = min(max(x, lo), hi)                   # 起点夹在来源泳道线内，不悬空
+        sy, ty = y_of(idx[src]), y_of(idx[lane])
+        # 侧弓曲线：水平引出、侧弓、水平汇入（起点/终点切线都水平），与分叉的 S 形、上游实线都区分开
+        b = 18.0                                   # 向侧面弓出 18px；右侧放不下就翻到左边，两边都放不下退化成直线
+        if x + b + 6 > x_right or sx + b + 6 > x_right:
+            b = -18.0
+            if min(sx, x) - abs(b) - 6 < pad_l:
+                b = 0.0
+        port_lines.append('<path class="g-port" d="M %.1f %d C %.1f %d, %.1f %d, %.1f %d"/>'
+                          % (sx, sy, sx + b, sy, x + b, ty, x, ty))
+        port_by_lane[lane][src] += 1
+
     # ---- 第二遍：画泳道线 + 分叉曲线 + 两种圆点 ----
     nodes, heads, pasts = [], [], []
     for i, b in enumerate(lanes):
@@ -702,11 +775,15 @@ def svg_branch_graph(repo, width=920):
             # 口径与分支明细表一致：有 merge 提交才算「已并回」，只是被包含则说明是续写
             tip += (" ｜ 内容已含于 %s（无合并提交）" if b.get("merged_kind") == "contained"
                     else " ｜ 已并回 %s") % b["merged_into"]
+        for src, n in sorted(port_by_lane.get(name, {}).items()):   # 本泳道里从别处移植来的提交
+            tip += " ｜ 自 %s 选择性移植 %d 条" % (src, n)
         out.append('<text class="g-label" x="16" y="%d" data-tip="%s">%s</text>'
                    % (y + 4, esc(tip), esc(lane_label(name))))
         out.append('<text class="g-meta" x="%d" y="%d" text-anchor="end">%d / %d</text>'
                    % (width - 8, y + 4, b["commits_mine"], b["commits_total"]))
 
+    # 移植连线画在所有泳道线 / 分叉线之后、圆点之前：点状虚线压在圆点下面，别盖住圆点
+    out.extend(port_lines)
     # 后画的压在上面：折叠点 → 提交圆点 → HEAD 空心圆
     out.extend(pasts)
     out.extend(nodes)
@@ -808,6 +885,9 @@ def html_heatmap(repos):
         n = counter.get(d, 0)
         lv = 0 if n == 0 else (1 if n == 1 else 2 if n <= 3 else 3 if n <= 6 else 4)
         if n:                                      # 有提交的格子可点：直接跳到时间线那一天
+            # 那一年还没从云端加载回来时（自动模式刚打开、或分档模式的往年），前端先把它拉回来再跳；
+            # 页面上不用先点年份行 —— 这一判断在前端由「目标日还没渲染出来」这一条自然兜住，
+            # 生成端不再为此打任何标记（data-arch 已随这次改造去掉）。
             cells.append('<i data-l="%d" data-day="%s" role="button" tabindex="0"'
                          ' data-tip="%s：%d 次提交（点一下跳到当天）"></i>' % (lv, d, d, n))
         else:
@@ -860,7 +940,12 @@ WEEK_CN = ("周一", "周二", "周三", "周四", "周五", "周六", "周日")
 
 
 def html_timeline(repos):
-    """按天分组的时间线（倒序）。返回 (html, 提交总数)。"""
+    """按天分组的时间线（倒序）。返回 (html, 提交总数, 云端年份表)。
+
+    时间线按年分档：默认（自动加载模式）所有年份的提交一条 DOM 都不生成，只在时间线里按年留
+    「年份归档行」，页面打开后前端自动从 Worker 的 KV 按年（新 → 旧）拉回来现渲染；显式设置
+    WORKLOG_BUILD_YEAR 时回到分档模式：构建年（BUILD_YEAR）的提交整块内嵌，其余年份留归档行、
+    等用户点。云端年份表 = [(年份, 条数), …]（按年份倒序），没有云端年份时是空表。"""
     entries = []
     for r in repos:
         for c in r["commits"]:
@@ -868,8 +953,12 @@ def html_timeline(repos):
     entries.sort(key=lambda t: t[1], reverse=True)
 
     by_day = collections.OrderedDict()
+    arch_days = collections.OrderedDict()       # 年份 -> {天: [(仓库, 提交)]}：不落 DOM，只统计
     for day, _date, key, c in entries:
-        by_day.setdefault(day, []).append((key, c))
+        if not TIMELINE_AUTO and day[:4] == BUILD_YEAR:
+            by_day.setdefault(day, []).append((key, c))
+        else:
+            arch_days.setdefault(day[:4], collections.OrderedDict()).setdefault(day, []).append((key, c))
 
     blocks, total = [], 0
     for day, lst in by_day.items():
@@ -906,10 +995,38 @@ def html_timeline(repos):
                       '<div class="tl-panel" id="%s"><div class="tl-clip"><div class="tl-items">%s</div></div></div></div>'
                       % (day, pid, icon("chev", "tri"), day, wd, len(lst), repos_of_day,
                          pid, "".join(rows)))
-    return "".join(blocks), total
+    # 年份归档行：按年份倒序排（新在上、旧在下）——分档模式下构建年那几天排在最前，年份行接在后面。
+    # 行里给足信息（年份、条数、仓库分布），但一条提交都不下发。右侧状态分两种：自动模式是一行
+    # 轻量状态文字（页面打开就自己拉，失败才变成可点的重试），分档模式是一个「从云端加载」按钮。
+    arch_rows, arch_info = [], []
+    for year in sorted(arch_days, reverse=True):
+        days_of_year = arch_days[year]
+        n = sum(len(v) for v in days_of_year.values())
+        per_repo = collections.Counter(k for v in days_of_year.values() for k, _ in v)
+        dist = " · ".join("%s %d" % (esc(k), c) for k, c in per_repo.most_common())
+        if TIMELINE_AUTO:
+            tail = '<span class="tl-year-state">正在从云端加载…</span>'
+            row_tip = (' data-tip="%s 年的 %d 条提交不随页面下发，页面打开后自动从 Cloudflare'
+                       ' Worker 的 KV 拉回来现渲染"' % (year, n))
+        else:
+            tail = ('<button class="tl-year-btn" type="button"'
+                    ' data-tip="%s 年的提交不随页面下发（本页只内嵌 %s 年），点一下从 Cloudflare'
+                    ' Worker 的 KV 拉回来现渲染">从云端加载</button>' % (year, BUILD_YEAR))
+            row_tip = ''
+        arch_rows.append(
+            '<div class="tl-year-row%s" data-arch-year="%s"%s>'
+            '<div class="tl-year-main"><span class="tl-year-num">%s</span>'
+            '<span class="tl-year-sub">%d 次提交 · 分布 %s</span></div>%s</div>'
+            % (" is-auto" if TIMELINE_AUTO else "", year, row_tip, year, n, dist, tail))
+        arch_info.append((year, n))
+    arch_total = sum(n for _y, n in arch_info)
+    return "".join(blocks) + "".join(arch_rows), total + arch_total, arch_info
 
 
 def html_branch_table(repo):
+    ports = collections.defaultdict(collections.Counter)   # 分支 -> {来源分支: 移植条数}
+    for lane, src, _day in port_records(repo):
+        ports[lane][src] += 1
     rows = []
     for b in repo["branches"]:
         if b["name"] == repo["main"]:
@@ -922,6 +1039,10 @@ def html_branch_table(repo):
                 # 有 merge 提交才是真合并；否则只是被对方从 tip 直接续写（内容已含于）
                 fork += ("，内容已含于 %s（无合并提交）" if b.get("merged_kind") == "contained"
                          else "，已并回 %s") % b["merged_into"]
+        adds = "，".join("自 %s 选择性移植 %d 条" % (s, n)
+                        for s, n in sorted(ports.get(b["name"], {}).items()))
+        if adds:
+            fork += "；" + adds
         span = "—" if not b["first"] else (b["first"] if b["first"] == b["last"]
                                            else "%s ~ %s" % (b["first"], b["last"]))
         rows.append('<tr><td><code>%s</code></td><td class="num">%d</td><td class="num">%d</td>'
@@ -974,6 +1095,8 @@ def graph_legend(repo):
         chips.append('<span><span class="lg-fork"></span>从我的提交分出</span>')
     if forks["up"]:
         chips.append('<span><span class="lg-fork-up"></span>从上游的提交分出</span>')
+    if port_records(repo):
+        chips.append('<span><span class="lg-port"></span>选择性移植</span>')
     chips.append('<span class="lg-note">圆点 = 我当天的提交（越大越多）｜ <span class="lg-head"></span>分支 HEAD ｜ '
                  '<span class="lg-past"></span>两个月前已折叠 ｜ 右侧数字 = 我 / 分支共</span>')
     chips.append('<span class="lg-hint">← 手机上可左右滑动</span>')
@@ -1039,15 +1162,24 @@ def html_filters(repos):
     return "".join(out)
 
 
-timeline_html, timeline_total = html_timeline(repos)
+timeline_html, timeline_total, TIMELINE_ARCH = html_timeline(repos)
+# 给前端的云端加载信息：年份表 + auto（自动模式：页面打开就按年自己拉）+ Worker 地址 + 类型判定地址。
+# 没有云端年份时注入空对象，前端那段代码直接判空跳过、零开销。
+ARCHIVE_JSON = json.dumps(
+    {"api": API_BASE,
+     "auto": TIMELINE_AUTO,
+     "years": [{"year": int(y), "count": n} for y, n in TIMELINE_ARCH],
+     "kindsUrl": API_BASE.rstrip("/") + "/classify.json"},
+    ensure_ascii=False) if TIMELINE_ARCH else "{}"
 REPO_SUB = "、".join(r["key"] for r in repos)
 REPO_NCN = {1: "一", 2: "两", 3: "三", 4: "四", 5: "五"}.get(len(repos), str(len(repos)))   # 仓库数的中文写法
 
 CSS_C = """
   /* 分支拓扑图例：只留「线条怎么画」，圆点含义走一句话说明，不再一项一个图形 */
-  .lg-main, .lg-lane, .lg-fork, .lg-up, .lg-fork-up { display: inline-block; width: 18px; height: 0; border-top: 2.8px solid var(--accent); vertical-align: 4px; margin-right: 6px; }
+  .lg-main, .lg-lane, .lg-fork, .lg-up, .lg-fork-up, .lg-port { display: inline-block; width: 18px; height: 0; border-top: 2.8px solid var(--accent); vertical-align: 4px; margin-right: 6px; }
   .lg-lane { border-top-width: 1.8px; border-top-color: var(--border-strong); }
   .lg-fork { border-top-width: 1.4px; border-top-style: dashed; opacity: 0.85; }
+  .lg-port { border-top-width: 1.4px; border-top-style: dotted; opacity: 0.9; }
   .lg-up { border-top-width: 2.4px; border-top-color: var(--up); }
   .lg-fork-up { border-top-width: 1.4px; border-top-style: dashed; border-top-color: var(--up); opacity: 0.85; }
   .lg-past { display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.4px dashed var(--muted); vertical-align: 1px; margin-right: 5px; }
@@ -1163,6 +1295,37 @@ CSS_C = """
     .graph-wrap { box-shadow: inset -22px 0 16px -18px color-mix(in srgb, var(--fg) 35%, transparent); }
     /* 窄屏别把整张图压到看不清：给个更大的最小宽度，左右滑动看（下面图例里已经写了这句提示） */
     .graph-wrap svg { min-width: 760px; }
+    .tl-year-row::before { left: -20px; }
+  }
+
+  /* 时间线：年份行 —— 那一年的提交不随页面下发，由前端从 Worker 的 KV 拉回来现渲染。
+     跟 .tl-day 的日期行共用左侧时间轴，只是圆点画成虚线（＝还没落地的日组）。
+     右侧状态两种形态：分档模式是「从云端加载」按钮；自动模式（.is-auto）是一行轻量状态文字，
+     页面打开就自己拉，失败才变成可点的重试胶囊（.is-fail） */
+  .tl-year-row {
+    position: relative; display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    padding: 9px 11px; border-radius: 11px; cursor: pointer;
+    box-shadow: inset 0 0 0 1px var(--border); transition: background-color 0.18s ease;
+  }
+  .tl-year-row::before { content: ""; position: absolute; left: -23px; top: 14px; width: 9px; height: 9px; border-radius: 50%; border: 1.4px dashed var(--muted); }
+  .tl-year-row.is-loading { cursor: progress; }
+  .tl-year-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .tl-year-num { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tl-year-sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-year-btn { margin-left: auto; flex: none; white-space: nowrap; font-size: 12px; padding: 5px 12px; border-radius: 999px; color: var(--accent); background: var(--accent-soft); transition: opacity 0.18s ease; }
+  .tl-year-btn:disabled { cursor: progress; opacity: 0.72; }
+  .tl-year-state { margin-left: auto; flex: none; white-space: nowrap; font-size: 12px; color: var(--muted); }
+  .tl-year-row.is-auto { cursor: default; }
+  .tl-year-row.is-loading .tl-year-state { animation: wl-year-pulse 1.5s ease-in-out infinite; }
+  @keyframes wl-year-pulse { 50% { opacity: 0.4; } }
+  .tl-year-row.is-fail { cursor: pointer; }
+  .tl-year-row.is-fail .tl-year-state { padding: 5px 12px; border-radius: 999px; color: var(--accent); background: var(--accent-soft); animation: none; }
+  @media (prefers-reduced-motion: reduce) { .tl-year-row.is-loading .tl-year-state { animation: none; } }
+  @media (hover: hover) and (pointer: fine) {
+    .tl-year-row:hover { background: var(--card-hover); }
+  }
+  @media (hover: none), (pointer: coarse) {
+    .tl-year-row:active { background: var(--card-hover); }
   }
 
   /* ---------- 字体：英文与数字优先 Inter，中文优先苹方 / 鸿蒙 / 思源，等宽优先 JetBrains Mono / Cascadia ---------- */
@@ -1251,8 +1414,19 @@ FILTER_JS = """
 
       /* ---------- 工作日志：时间线折叠（点日期行展开 / 收起） ---------- */
       (function () {
-        var days = Array.prototype.slice.call(document.querySelectorAll('.tl-day'));
-        if (!days.length) return;
+        var days = [];
+        /* 绑一行日期：记进列表 + 挂折叠按钮。按需从云端加载回来的日组也走这个函数，
+           绑法与首屏完全一致（页面自我换新后脚本重跑，重新绑的也是这一份） */
+        function hook(day) {
+          if (days.indexOf(day) >= 0) return;
+          days.push(day);
+          var btn = day.querySelector('.tl-sum');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            var open = day.classList.toggle('is-open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
+        }
         window.__wlCollapseAll = function () {
           days.forEach(function (day) {
             day.classList.remove('is-open');
@@ -1260,14 +1434,8 @@ FILTER_JS = """
             if (b) b.setAttribute('aria-expanded', 'false');
           });
         };
-        days.forEach(function (day) {
-          var btn = day.querySelector('.tl-sum');
-          if (!btn) return;
-          btn.addEventListener('click', function () {
-            var open = day.classList.toggle('is-open');
-            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-          });
-        });
+        window.__wlBindDay = hook;                     /* 后加载的日组用这个挂折叠 */
+        Array.prototype.slice.call(document.querySelectorAll('.tl-day')).forEach(hook);
       })();
 
       /* ---------- 工作日志：时间线筛选（仓库 / 类型），每次切换都回到全部折叠 ---------- */
@@ -1275,7 +1443,8 @@ FILTER_JS = """
         var items = Array.prototype.slice.call(document.querySelectorAll('.tl-item'));
         var days = Array.prototype.slice.call(document.querySelectorAll('.tl-day'));
         var tags = Array.prototype.slice.call(document.querySelectorAll('.tag-repo[data-repo]'));
-        if (!items.length) return;
+        /* 这里不提前 return：按需从云端加载回来的日组也要能筛，哪怕首屏一条内嵌都没有
+           （年初刚开年、或者为了自测强制了往年当构建年时就是这样） */
         var state = { repo: 'all', branch: 'all', kind: 'all' };
         var branchGroup = document.querySelector('.filters-branch');
         var branchBtns = Array.prototype.slice.call(document.querySelectorAll('[data-filter="branch"]'));
@@ -1453,6 +1622,24 @@ FILTER_JS = """
           endGrow();
         };
 
+        /* 按需从云端加载回来的日组：并进上面那三份列表，当前筛选立刻对它生效（显隐 / 计数 / 折叠）。
+           传进来的是刚插进 DOM 的 .tl-day 节点；查询都在调用时实时做，不跨页面自我换新留节点引用。 */
+        window.__wlAdopt = function (nodes) {
+          var sel = '.tl-day, .tl-item, .tag-repo[data-repo]', fresh = [];
+          (nodes || []).forEach(function (node) {
+            if (node.matches && node.matches(sel)) fresh.push(node);
+            if (node.querySelectorAll) fresh = fresh.concat(Array.prototype.slice.call(node.querySelectorAll(sel)));
+          });
+          fresh.forEach(function (el) {
+            if (el.classList.contains('tl-day')) { if (days.indexOf(el) < 0) days.push(el); }
+            else if (el.classList.contains('tl-item')) { if (items.indexOf(el) < 0) items.push(el); }
+            else if (tags.indexOf(el) < 0) tags.push(el);
+          });
+          flip();                     /* 落地：换 hidden、仓库标签、重置折叠，右侧计数也一起更新 */
+          settleDays();               /* 一进来就被筛没的日组趁早收起，别留半截高度 */
+          endGrow();
+        };
+
         Array.prototype.slice.call(document.querySelectorAll('[data-filter]')).forEach(function (btn) {
           btn.addEventListener('click', function () {
             var group = btn.dataset.filter;
@@ -1501,16 +1688,278 @@ FILTER_JS = """
           return true;
         };
 
+        /* 目标那天还没渲染出来（自动模式刚打开、或分档模式的往年）：先让年份行把那一年拉回来，再跳。
+           判断只看「目标日渲染出来没有」，生成端不再为格子打标记（全部格子一视同仁）。
+           __wlLoadYear 由下面「年份行」那段定义，点的时候才查（页面自我换新后也是新的一份） */
+        function jump(cell) {
+          var day = cell.dataset.day || '';
+          if (window.__wlGotoDay(day)) return;         /* 页面里已经有这一天（内嵌 / 已经加载回来）：直接跳 */
+          if (!window.__wlLoadYear) return;            /* 没接云端：维持原样（跟以前点到空白一样） */
+          var year = day.slice(0, 4);
+          window.__wlLoadYear(year).then(function (ok) {
+            if (ok) { window.__wlGotoDay(day); return; }
+            if (window.__tipHide) window.__tipHide();
+            /* 拉失败时年份行自己变成了重试态：滚过去让人看见，别像点了没反应 */
+            var row = document.querySelector('.tl-year-row[data-arch-year="' + year + '"]');
+            if (row) row.scrollIntoView({ block: 'center' });
+          });
+        }
+
         /* 事件走委托：贪吃蛇把格子重画一遍后照样能点 */
         document.addEventListener('click', function (ev) {
           var cell = ev.target.closest ? ev.target.closest('.heat i[data-day]') : null;
-          if (cell) window.__wlGotoDay(cell.dataset.day);
+          if (cell) jump(cell);
         });
         document.addEventListener('keydown', function (ev) {
           if (ev.key !== 'Enter' && ev.key !== ' ') return;
           var cell = ev.target.closest ? ev.target.closest('.heat i[data-day]') : null;
-          if (cell) { ev.preventDefault(); window.__wlGotoDay(cell.dataset.day); }
+          if (cell) { ev.preventDefault(); jump(cell); }
         });
+      })();
+
+      /* ---------- 工作日志：时间线年份行 —— 那一年的提交不随页面下发，从云端 KV 拉回来现渲染 ----------
+         默认（自动加载，ARCH.auto）：每一年的提交都不内嵌，页面打开后自动按年（新 → 旧）依次拉回，
+         失败停在那一年的行上、点击重试；显式分档（ARCH.auto 不为真）：只有构建年那一份内嵌在页面里，
+         其余年份等用户点行加载。两种模式共用下面这一整套 fetch / 渲染 / 绑定代码。
+         云端全量数据 + 类型判定每次打开只拉一遍（多年份共享同一个 Promise，见 bundle()）。 */
+      (function () {
+        var ARCH = __WL_ARCHIVE__;
+        if (!ARCH || !ARCH.years || !ARCH.years.length) return;   /* 没有云端年份：整段零开销 */
+        var api = String(ARCH.api || '').replace(/[/]+$/, '');
+        var kindsUrl = ARCH.kindsUrl || (api + '/classify.json');
+        var AUTO = !!ARCH.auto;                       /* true = 页面打开就自己按年拉（默认模式） */
+        var KIND_CN = __KIND_CN__;
+        var WEEK_CN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        /* 与生成器 ICONS 里的 commit / chev 逐字一致（结构照抄，图标也是同一份） */
+        var ICON_COMMIT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">'
+          + '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v5.8M12 15.2V21"/></svg>';
+        var ICON_CHEV = '<svg class="tri" viewBox="0 0 24 24" aria-hidden="true">'
+          + '<path d="m9.5 6 6 6-6 6"/></svg>';
+        var pending = {};             /* 年份 -> 正在跑的加载 Promise（连点两次不重复拉） */
+        var loaded = {};              /* 年份 -> 已有结论（展开完成 / 云端是空的）：再点、自动调度都不重复 */
+        /* 页面自我换新（document.write 换整页）会重跑本脚本：window 上的代次 +1，旧闭包手里的
+           加载结果就此作废 —— 旧的那份数据 / 节点不能再往新文档里塞，否则两年的日组会各来一遍 */
+        var epoch = (window.__wlEpoch || 0) + 1;
+        window.__wlEpoch = epoch;
+        var fetchAll = null;          /* data.json + classify.json 的共享 Promise：一次打开只拉一遍 */
+
+        function bundle() {
+          if (!fetchAll) {
+            fetchAll = Promise.all([
+              fetch(api + '/data.json', { cache: 'no-store' }).then(function (r) {
+                if (!r.ok) throw new Error('data.json ' + r.status);
+                return r.json();
+              }),
+              /* 类型判定拉不到不算失败：用提交自带的 kind（＝生成器没有 kinds 文件时的同一口径） */
+              fetch(kindsUrl, { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .catch(function () { return null; })
+            ]).then(function (res) {
+              return { data: res[0], kinds: (res[1] && res[1].kinds) || {} };
+            });
+            fetchAll.catch(function () { fetchAll = null; });   /* 失败不留备忘：重试时重新拉一遍 */
+          }
+          return fetchAll;
+        }
+
+        /* 现拼日组全走 DOM API，不拼 HTML 串：结构 / 类名 / 属性与生成器那条模板一字不差，
+           但页面源码里不会多出「内嵌的 .tl-item 标记」——自检脚本就是按这个标记数断言
+           「时间线里一条提交都没内嵌」的，云端加载这段代码本身不能把它带脏。 */
+        function box(tag, cls) {
+          var n = document.createElement(tag);
+          if (cls) n.className = cls;
+          return n;
+        }
+        function txt(tag, cls, value) {
+          var n = box(tag, cls);
+          n.textContent = String(value);            /* textContent 自带转义，属性值走 setAttribute */
+          return n;
+        }
+        function iconNode(html) {
+          var holder = document.createElement('div');
+          holder.innerHTML = html;
+          return holder.firstChild;
+        }
+
+        function wdOf(day) {          /* 与生成器同一套：Python 里周一 = 0，JS 里周日 = 0 */
+          var d = new Date(day + 'T00:00:00');
+          return isNaN(d.getTime()) ? '' : WEEK_CN[(d.getDay() + 6) % 7];
+        }
+
+        function itemNode(key, url, c, kinds) {      /* 生成器那条 .tl-item：kind 圆点 + 正文 + 标签 */
+          var rule = c.kind, ai = kinds[c.sha], kind = ai || rule;
+          var item = box('div', 'tl-item');
+          item.setAttribute('data-repo', key);
+          item.setAttribute('data-kind', kind);
+          item.setAttribute('data-branches', (c.branches || []).map(function (b) {
+            return key + '|' + b;
+          }).join(' '));
+          item.appendChild(iconNode(ICON_COMMIT));
+
+          var body = box('div', 'tl-body');
+          body.appendChild(txt('div', 'tl-msg', c.subject));
+          var meta = box('div', 'tl-meta');
+          var repoTag = txt('span', 'tag tag-repo', key);
+          repoTag.setAttribute('data-repo', key);
+          meta.appendChild(repoTag);
+          (c.branches || []).forEach(function (b) {
+            meta.appendChild(txt('span', 'tag tag-branch', b));
+          });
+          var kindTag = box('span', 'tag');
+          if (ai && ai !== rule) {                   /* AI 判过的如实标一句，与生成器同一口径 */
+            kindTag.setAttribute('data-tip', 'AI 判定的类型：' + (KIND_CN[kind] || kind)
+              + '（原按前缀 / 关键词是「' + (KIND_CN[rule] || rule) + '」）');
+          }
+          kindTag.appendChild(box('i', 'kd kd-' + kind));
+          kindTag.appendChild(document.createTextNode(KIND_CN[kind] || kind));
+          meta.appendChild(kindTag);
+          var commit = txt('a', 'tag tag-commit', c.short + ' ↗');
+          commit.setAttribute('href', url + '/commit/' + c.short);
+          commit.setAttribute('target', '_blank');
+          commit.setAttribute('rel', 'noopener');
+          commit.setAttribute('title', '在 GitHub 查看这次提交');
+          meta.appendChild(commit);
+          meta.appendChild(txt('span', null, c.files + ' 个文件'));
+          body.appendChild(meta);
+          item.appendChild(body);
+          return item;
+        }
+
+        function dayNode(day, lst, kinds) {          /* 生成器那个 .tl-day 日组 */
+          var wrap = box('div', 'tl-day');
+          wrap.setAttribute('data-day', day);
+          var pid = 'tl-' + day;
+          var sum = box('button', 'tl-sum');
+          sum.setAttribute('type', 'button');
+          sum.setAttribute('aria-expanded', 'false');
+          sum.setAttribute('aria-controls', pid);
+          sum.appendChild(iconNode(ICON_CHEV));
+          sum.appendChild(txt('span', 'tl-date', day));
+          sum.appendChild(txt('em', null, wdOf(day) + ' · ' + lst.length + ' 次提交'));
+          var keys = [];
+          lst.forEach(function (e) { if (keys.indexOf(e.key) < 0) keys.push(e.key); });
+          keys.forEach(function (k) {
+            var pill = txt('span', 'tag tag-repo', k);
+            pill.setAttribute('data-repo', k);
+            sum.appendChild(pill);
+          });
+          wrap.appendChild(sum);
+          var panel = box('div', 'tl-panel');
+          panel.setAttribute('id', pid);
+          var clip = box('div', 'tl-clip');
+          var itemsBox = box('div', 'tl-items');
+          lst.forEach(function (e) { itemsBox.appendChild(itemNode(e.key, e.url, e.c, kinds)); });
+          clip.appendChild(itemsBox);
+          panel.appendChild(clip);
+          wrap.appendChild(panel);
+          return wrap;
+        }
+
+        function yearNodes(data, kinds, year) {      /* 跨仓库合并该年，排序与生成器一致 */
+          var entries = [];
+          (data.repos || []).forEach(function (r) {
+            (r.commits || []).forEach(function (c) {
+              if (String(c.day || '').slice(0, 4) === year) {
+                entries.push({ day: c.day, date: c.date, key: r.key, url: r.url, c: c });
+              }
+            });
+          });
+          /* date 倒序（稳定排序 = 天内保持数据原序，和生成器 entries.sort 一致），再按天分组 */
+          entries.sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+          var order = [], byDay = {};
+          entries.forEach(function (e) {
+            if (!byDay[e.day]) { byDay[e.day] = []; order.push(e.day); }
+            byDay[e.day].push(e);
+          });
+          return order.map(function (d) { return dayNode(d, byDay[d], kinds); });
+        }
+
+        function take(row, nodes) {                  /* 年份行原地换成真实日组，接回折叠 / 筛选 */
+          var parent = row.parentNode;
+          nodes.forEach(function (node) {
+            parent.insertBefore(node, row);
+            if (window.__wlBindDay) window.__wlBindDay(node);
+          });
+          parent.removeChild(row);
+          if (window.__wlAdopt) window.__wlAdopt(nodes);
+        }
+
+        function stateNode(row) {                    /* 分档模式是按钮；自动模式是行内状态文字 */
+          return row.querySelector('.tl-year-btn') || row.querySelector('.tl-year-state');
+        }
+        function setState(row, kind, text) {         /* kind: loading / fail / empty */
+          var el = stateNode(row);
+          if (el) {
+            el.textContent = text;
+            if (el.tagName === 'BUTTON') el.disabled = (kind === 'loading');
+          }
+          row.classList.toggle('is-loading', kind === 'loading');
+          row.classList.toggle('is-fail', kind === 'fail');
+        }
+
+        function failRest(except) {                  /* 一份云端数据拉挂了：还没轮到的年份是同一个结局 */
+          Array.prototype.slice.call(document.querySelectorAll('.tl-year-row[data-arch-year]'))
+            .forEach(function (row) {
+              var y = row.getAttribute('data-arch-year');
+              if (y !== except && !loaded[y] && !pending[y]) setState(row, 'fail', '加载失败，点击重试');
+            });
+        }
+
+        function load(year) {                        /* 热力图跳转也调它：返回 Promise，成功 = true */
+          year = String(year);
+          if (loaded[year]) return Promise.resolve(true);
+          if (pending[year]) return pending[year];
+          var sel = '.tl-year-row[data-arch-year="' + year + '"]';
+          var row = document.querySelector(sel);
+          if (!row) return Promise.resolve(true);    /* 没有这一年的年份行：那天的日组本来就在页面里 */
+          setState(row, 'loading', '正在从云端加载…');
+          pending[year] = bundle().then(function (b) {
+            pending[year] = null;
+            if (window.__wlEpoch !== epoch) return true;   /* 页面已被换新：结果作废，交给新脚本那一份 */
+            var live = document.querySelector(sel);
+            if (!live) {                             /* 已经展开过 / 行被换掉：记成有结论，别把自动加载的队卡住 */
+              loaded[year] = true;
+              if (AUTO) autoNext();
+              return true;
+            }
+            var nodes = yearNodes(b.data, b.kinds, year);
+            if (!nodes.length) {                     /* 云端这一年的确是空的（页面比 KV 新时会出现）：
+                                                        如实说明并继续往更早的年份走，别把后面几年一起卡住 */
+              loaded[year] = true;                   /* 记成「已有结论」：自动调度不再轮它，点击也不再重试 */
+              setState(live, 'empty', '云端没有这一年的数据');
+              if (AUTO) autoNext();
+              return false;
+            }
+            take(live, nodes);                       /* 年份行没了：再点也不会重复加载 */
+            loaded[year] = true;
+            if (AUTO) autoNext();                    /* 自动模式：接着拉下一年（新 → 旧） */
+            return true;
+          }).catch(function () {                     /* 网络 / 非 200：年份行原地变重试态 */
+            pending[year] = null;
+            if (window.__wlEpoch !== epoch) return true;
+            var live = document.querySelector(sel);
+            if (live) setState(live, 'fail', '加载失败，点击重试');
+            if (AUTO) failRest(year);
+            return false;
+          });
+          return pending[year];
+        }
+        window.__wlLoadYear = load;                  /* 热力图点格子时先调它，再跳那一天 */
+
+        function autoNext() {                        /* 自动模式：按时间线顺序（新 → 旧）拉第一个还没回来的 */
+          if (!AUTO) return;
+          var rows = document.querySelectorAll('.tl-year-row[data-arch-year]');
+          for (var i = 0; i < rows.length; i++) {
+            var y = rows[i].getAttribute('data-arch-year');
+            if (!loaded[y] && !pending[y]) { load(y); return; }   /* 成功接下一年；失败停在那行等重试 */
+          }
+        }
+
+        Array.prototype.slice.call(document.querySelectorAll('.tl-year-row[data-arch-year]')).forEach(function (row) {
+          row.addEventListener('click', function () { load(row.getAttribute('data-arch-year')); });
+        });
+
+        if (AUTO) autoNext();                        /* 页面打开后自动依次加载所有年份（新 → 旧） */
       })();
 
       /* ---------- 工作日志：热力图小方格按卡片宽度定尺寸（正方形、列距 = 边长 + 缝，蛇按列走才不偏） ---------- */
@@ -1942,7 +2391,7 @@ MAIN_TMPL = """
     <!-- 3. 分支拓扑 -->
     <section class="section" id="graph">
       <h2 class="section-title">分支拓扑</h2>
-      <p class="section-desc">每个仓库一张图：横轴时间、纵轴分支泳道。曲线表示「这条分支从哪条分支的哪个提交分出来」，泳道上的圆点是我当天的提交（越大说明当天越多），空心圆是分支 HEAD。浅紫 = 上游作者的部分（主线里我接手之前的那一截、从上游提交分出去的曲线），青色 = 我的。</p>
+      <p class="section-desc">每个仓库一张图：横轴时间、纵轴分支泳道。曲线表示「这条分支从哪条分支的哪个提交分出来」，泳道上的圆点是我当天的提交（越大说明当天越多），空心圆是分支 HEAD。浅紫 = 上游作者的部分（主线里我接手之前的那一截、从上游提交分出去的曲线），青色 = 我的。点状连线 = 从其他分支选择性移植过来的内容。</p>
       __GRAPH_CARDS__
     </section>
 
@@ -1978,7 +2427,7 @@ MAIN_TMPL = """
     <!-- 6. 提交时间线 -->
     <section class="section" id="timeline">
       <h2 class="section-title">提交时间线</h2>
-      <p class="section-desc">按时间倒序排列，共 __TIMELINE_TOTAL__ 条记录，可按仓库或类型筛选。</p>
+      <p class="section-desc">按时间倒序排列，共 __TIMELINE_TOTAL__ 条记录__TIMELINE_ARCH_NOTE__，可按仓库或类型筛选。</p>
       __FILTERS__
       <div class="tl">__TIMELINE__</div>
     </section>
@@ -1987,6 +2436,13 @@ MAIN_TMPL = """
 
 def build_main():
     avg_files = round(file_touches / total_mine, 1) if total_mine else 0
+    # 时间线说明：自动模式一句话说清「全历史都在云端、页面打开自己按年拉」；
+    # 分档模式仍如实列出有哪些年份、共多少条躺在云端，等用户点行
+    if TIMELINE_AUTO:
+        arch_note = "，时间线由云端自动加载（按年拉取，跨年自动归档）" if TIMELINE_ARCH else ""
+    else:
+        arch_note = ("，其中 %s存于云端，点击年份行加载"
+                     % "、".join("%s 年的 %d 条" % (y, n) for y, n in TIMELINE_ARCH)) if TIMELINE_ARCH else ""
     out = MAIN_TMPL
     arrow = ('<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">'
              '<path d="M4.5 12h14"/><path d="m13 6.5 5.5 5.5L13 17.5"/></svg>')
@@ -2009,6 +2465,7 @@ def build_main():
         ("__TABLES__", branch_tables),
         ("__FILTERS__", html_filters(repos)),
         ("__TIMELINE_TOTAL__", str(timeline_total)),
+        ("__TIMELINE_ARCH_NOTE__", arch_note),
         ("__TIMELINE__", timeline_html),
         ("__I_GIT__", icon("git")),
         ("__I_ARROW__", arrow),
@@ -2044,6 +2501,7 @@ tpl = tpl[:m.start()] + '<main class="content" id="home">' + main_html + "  </ma
 tpl = tpl.replace("</script>", FILTER_JS.replace("__WL_API__", API_BASE).replace("__WL_BUILD__", BUILD_AT)
                   .replace("__KIND_CN__", json.dumps(KIND_LABEL, ensure_ascii=False))
                   .replace("__WL_REPO__", REPO_SLUG)
+                  .replace("__WL_ARCHIVE__", ARCHIVE_JSON)
                   + "  </script>", 1)
 
 with open(OUT, "w", encoding="utf-8") as f:

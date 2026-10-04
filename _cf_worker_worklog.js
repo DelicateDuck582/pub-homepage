@@ -6,14 +6,16 @@
  *      整理成和本地 worklog-data.json 同构的数据，只在**真的有变化**时才写 KV（空闲不产生写入）；
  *      数据一变就顺手判新提交的类型、重建时间线快照，并给站点仓库发 repository_dispatch
  *      —— 让 GitHub Actions 立刻重新渲染整页（提交节奏 / 分支拓扑 / 分支明细 / 提交时间线四处一起更新）。
- *   2) 可选：用 Workers AI（绑定 AI）逐条判定提交类型（在既有的 13 个类型里选），存 KV 并提供
- *      GET /classify.json 给页面生成脚本取用（没有绑定就跳过，不影响采集）；
- *   3) 给页面打开时「先拉一下」用（KV 里的键：data / localData / stage / dataHash / kinds / timeline / page / pageAt）：
+ *   2) 可选：用 Workers AI（绑定 AI）逐条判定提交类型（在既有的 13 个类型里选）并顺带判「移植来源」
+ *      （ported_from，结果存 KV 的 ports），前者提供 GET /classify.json、后者提供 GET /ports.json
+ *      （没有绑定就跳过，不影响采集）；
+ *   3) 给页面打开时「先拉一下」用（KV 里的键：data / localData / stage / dataHash / kinds / ports / timeline / page / pageAt）：
  *      GET /stage.json     轻量摘要（生成时间、总量、最新几条提交）——页面拿它比对自家构建时间；
  *      GET /timeline.json  时间线快照（每条提交一行，kind 已按 AI 判定盖过）；
  *                          ?since=<ISO> 只回比它新的，页面用它把新提交补出来，不必等整页重建；
  *      GET /data.json      完整数据（与 worklog-data.json 同构，排查用）；
  *      GET /classify.json  每条提交的 AI 类型判定（页面生成脚本取它落到类型上）；
+ *      GET /ports.json     每条提交的 AI 移植来源判定（sha → 来源分支名；本地 _collect.py 取它合并移植判定）；
  *      GET /page.html      最近一次发布上来的整页 HTML（本地任务或 Actions 用 PUT /publish 上传），
  *                          页面发现它更新时会直接换掉正文，等于打开就拿到最新渲染结果。
  *   4) 写入接口（需要 PUBLISH_TOKEN）：
@@ -268,7 +270,11 @@ async function collect(env, budget) {
             f = Object.assign({ files: (d.files || []).length }, extInfo(d.files || []));
             await env.WL.put(fkey, JSON.stringify(f), { expirationTtl: 400 * 86400 });
           }
-          const subject = String(c.commit.message || '').split('\n')[0];
+          const fullMsg = String(c.commit.message || '');
+          const subject = fullMsg.split('\n')[0];
+          /* 提交正文（标题行之后的剩余部分）前 300 字符：给 AI 判「移植来源」用；
+             旧缓存（data 里老提交）没有这个字段，下游一律按缺失容忍（c.body || ''） */
+          const body = fullMsg.split('\n').slice(1).join('\n').trim().slice(0, 300);
           /* 口径与本地 _collect.py 的 %aI 对齐：GitHub 给 UTC，这里换算成作者时区（北京 +08:00），
              否则 9-25 早上的提交会被算到 UTC 的 9-24，days 也就和本地对不上 */
           /* 优先用本地那份的原始时区时间（见上面 dateMap），新提交才用 UTC+8 估算 */
@@ -280,7 +286,7 @@ async function collect(env, budget) {
             else if (f.plain) kind = 'chore';
           }
           commits[sha] = {
-            sha, short: sha.slice(0, 7), subject, kind, date, day: date.slice(0, 10),
+            sha, short: sha.slice(0, 7), subject, body, kind, date, day: date.slice(0, 10),
             files: f.files, ext: f.ext, merge: (c.parents || []).length > 1 ? 1 : 0, branches: [],
           };
         }
@@ -402,6 +408,9 @@ const KIND_SYS = [
   '输入：{"repo":"仓库名","hint":"这个仓库是什么","commits":[{"sha":"...","subject":"标题","was":"规则按前缀/关键词判的类型","dirs":["改动目录"],"files":文件数}]}',
   '输出：只输出一个 JSON 对象，键是原样的 sha，值是上面 13 个键之一；不要解释、不要代码围栏、不要别的字段。',
   'was 只是参考，标题前缀常常不靠谱：例如「sync(cos-exchange): 与 browse-alist 同步 worker（/temp 在线查看 + Range + 整目录筛选）」是在加新能力，应判 feat，而不是按 sync 前缀当 chore。',
+  '补充要求（移植来源）：以上类型判定照旧；若提交信息表明其改动是从某条分支移植/挑选/cherry-pick/backport 而来（如出现 cherry-pick、cherry pick、backport、pick from、从 xxx 分支移植/同步等字样），请在该 sha 的值里额外给出 ported_from 字段，值为来源分支名（只写分支名本身，如 main、dev）；判断不出来就省略该字段。',
+  '带移植来源时该 sha 的值写成 {"kind":"上面 13 个键之一","ported_from":"来源分支名"}；不带移植来源时照旧直接写类型键。',
+  '输入里每条提交可能多一个 body 字段（提交正文，可能被截断），供判断移植来源参考。',
 ].join('\n');
 
 /* 各仓库是什么，先告诉模型，帮它别按另一个仓库的思路判断 */
@@ -441,8 +450,8 @@ async function kindItems(env) {
     if (seen.has(c.sha)) return;
     seen.add(c.sha);
     out.push({
-      repo: r.key, sha: c.sha, subject: c.subject, was: c.kind || 'other',
-      dirs: dirsOf[c.sha] || [], files: c.files,
+      repo: r.key, sha: c.sha, subject: c.subject, body: c.body || '',   /* 旧缓存没有 body → 空串兜底 */
+      was: c.kind || 'other', dirs: dirsOf[c.sha] || [], files: c.files,
     });
   }));
   return out;
@@ -455,19 +464,25 @@ async function classifyBatch(env, repo, list) {
       repo,
       hint: REPO_HINT[repo] || '',
       commits: list.map((c) => ({
-        sha: c.sha.slice(0, 12), subject: c.subject, was: c.was, dirs: c.dirs, files: c.files,
+        sha: c.sha.slice(0, 12), subject: c.subject, body: String(c.body || '').slice(0, 300),
+        was: c.was, dirs: c.dirs, files: c.files,
       })),
     }) },
   ];
-  const out = await env.AI.run(KIND_MODEL, { messages, max_tokens: 700, temperature: 0.1 });
+  /* max_tokens 从 700 提到 1000：带 ported_from 的对象值比纯类型键长，防截断 */
+  const out = await env.AI.run(KIND_MODEL, { messages, max_tokens: 1000, temperature: 0.1 });
   const got = parseAiJson(out && out.response) || {};
-  const map = {};
+  const map = {}, ports = {};
   list.forEach((c) => {
     const v = got[c.sha.slice(0, 12)] || got[c.sha];
-    const k = typeof v === 'string' ? v.trim().toLowerCase() : '';
-    if (KIND_KEYS.indexOf(k) >= 0) map[c.sha] = k;      /* 只认这 13 个键，别的当没答 */
+    /* 值有两种形态：老样子直接给类型键字符串；带移植来源时给 {"kind":..,"ported_from":..} */
+    const k = typeof v === 'string' ? v.trim().toLowerCase()
+      : (v && typeof v === 'object' && typeof v.kind === 'string') ? v.kind.trim().toLowerCase() : '';
+    if (KIND_KEYS.indexOf(k) >= 0) map[c.sha] = k;      /* 只认这 13 个键，别的当没答（逻辑不变） */
+    const pf = v && typeof v === 'object' && typeof v.ported_from === 'string' ? v.ported_from.trim() : '';
+    if (pf) ports[c.sha] = pf.slice(0, 100);            /* 移植来源：存在且非空才收 */
   });
-  return { map, usage: (out && out.usage) || null };
+  return { map, ports, usage: (out && out.usage) || null };
 }
 
 
@@ -481,6 +496,7 @@ async function classifyKinds(env, maxBatches, reset) {
   todo.forEach((c) => { (byRepo[c.repo] = byRepo[c.repo] || []).push(c); });
 
   let done = 0, calls = 0, neurons = 0;
+  const portsGot = {};                                /* 本轮 AI 给出的移植来源（sha → 分支名） */
   for (const repo of Object.keys(byRepo)) {
     const list = byRepo[repo];
     for (let i = 0; i < list.length; i += KIND_BATCH) {
@@ -495,14 +511,21 @@ async function classifyKinds(env, maxBatches, reset) {
       calls += 1;
       if (got.usage && got.usage.neurons) neurons += got.usage.neurons;
       Object.keys(got.map).forEach((sha) => { kinds[sha] = got.map[sha]; done += 1; });
+      Object.keys(got.ports || {}).forEach((sha) => { portsGot[sha] = got.ports[sha]; });
       await env.WL.put('kinds', JSON.stringify({
         at: new Date().toISOString(), model: KIND_MODEL,
         usage: Math.round(neurons * 10) / 10, kinds,
       }));
     }
   }
+  /* 移植来源落盘：与 KV 里已有的合并（新值覆盖旧值，sha 也是），本轮没有新 port 就不写（空闲不产生写入） */
+  const portShas = Object.keys(portsGot);
+  if (portShas.length) {
+    const prevPorts = (await env.WL.get('ports', 'json')) || {};
+    await env.WL.put('ports', JSON.stringify(Object.assign({}, prevPorts, portsGot)));
+  }
   const pending = items.filter((c) => !kinds[c.sha]).length;
-  return { ok: true, total: items.length, classified: done, pending, calls };
+  return { ok: true, total: items.length, classified: done, pending, calls, ports: portShas.length };
 }
 
 async function ghWrite(env, path, payload) {
@@ -656,6 +679,10 @@ export default {
       const v = await env.WL.get('kinds');
       return jsonOut(v ? JSON.parse(v) : { empty: true });
     }
+    if (path === '/ports.json') {                 /* AI 判出的移植来源：sha → 来源分支名（没有就是空对象） */
+      const v = await env.WL.get('ports');
+      return jsonOut(v ? JSON.parse(v) : {});
+    }
     if (path === '/page.html') {
       const v = await env.WL.get('page');
       if (!v) return textOut('还没发布过页面：本地跑 `powershell -File _daily_update.ps1 -Publish`，或让 Actions 上传。', 'text/plain', 404);
@@ -673,6 +700,7 @@ export default {
         + 'GET /data.json   完整数据\n'
         + 'GET /timeline.json   时间线快照（?since=<ISO> 取增量，页面打开时用它补新提交）\n'
         + 'GET /classify.json  每条提交的 AI 类型判定（时间线「提交类型」吃这一份）\n'
+        + 'GET /ports.json     每条提交的 AI 移植来源判定（sha → 来源分支名，本地 _collect.py 取它合并移植判定）\n'
         + 'GET /page.html   最近发布的整页\n'
         + 'PUT /publish/page.html  上传整页（需 PUBLISH_TOKEN）\n'
         + 'POST /classify          给还没判过的提交补类型判定（需 PUBLISH_TOKEN，可加 ?batches=6&reset=1）\n'

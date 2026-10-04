@@ -7,15 +7,22 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
 | 文件 | 说明 |
 |---|---|
 | `index.html` | 主页 |
-| `worklog.html` | 工作日志：把 cloud-mail、SPlayer 与 ciyuan-translate 三个仓库（**所有分支**）里由我署名的提交，整理成统计卡、提交类型、热力图、分支拓扑和时间线。**自动生成，别手改。** |
+| `worklog.html` | 工作日志：把 cloud-mail、SPlayer 与 ciyuan-translate 三个仓库（**所有分支**）里由我署名的提交，整理成统计卡、提交类型、热力图、分支拓扑和时间线。**自动生成，别手改。** 统计、热力图、拓扑与分支明细都是全历史；时间线默认「云端自动加载」——静态页里一条提交都不内嵌（体积与提交条数无关），只按年留一行「年份行」，页面打开后自动从 Cloudflare Worker 的 KV 按年（新 → 旧）拉回来现渲染，失败点一下重试。显式设置生成变量 `WORKLOG_BUILD_YEAR` 时回到「分档」模式（那一年内嵌、其余年份点行加载），这是「2027 起自动分档」提前铺好的开关。 |
 | `提交类型规范.md` | 工作日志里「提交类型」的判定口径 |
 | `favicon.*` `apple-touch-icon.png` `logo.png` | 图标与 logo |
 
 ## 工作日志怎么来的
 
 1. `_collect.py`：用 git 拉三个仓库的提交图（`--filter=blob:none` 的裸库，只取提交元数据，很快），
-   算出分支树、分叉/并回关系、每个提交的类型与改动目录，写出 `worklog-data.json`；
+   算出分支树、分叉/并回关系、每个提交的类型与改动目录，写出 `worklog-data.json`；顺路取一份 Worker 的
+   `/ports.json`（Workers AI 判定的移植来源，落到 `worklog-ports.json`，取不到就忽略）——提交信息自述的
+   正则优先，AI 判定补位，两边的分支名都要能对回仓库真实分支，对不上不认；
 2. `_gen_worklog.py`：把数据渲染成自包含的 `worklog.html`（字体、图标、样式全部内联，无外部请求）；
+   时间线默认按年「云端自动加载」：所有年份的提交一条 DOM 都不生成，只在时间线里按年留一行「年份行」
+   （页面里带 `data-arch-year`），页面打开后自动去 Worker 的 `/data.json` + `/classify.json` 按年
+   （新 → 旧）拉回来现渲染——全量数据 + 类型判定每次打开只拉一遍，多年份共享同一份 Promise；失败停在
+   那一行、点击重试。显式设置 `WORKLOG_BUILD_YEAR` 时改走分档模式：那一年的提交整块内嵌（点击折叠照旧），
+   其余年份仍留年份行、点行才拉。热力图点任意小方格都能跳到时间线：目标那天还没渲染就先加载那一年再跳；
 3. `_cf_worker_worklog.js`：一个 Cloudflare Worker + KV，负责在云端也维护同一份数据：
    - 每天 cron 用 GitHub API 抓一次（免费版子请求受限，所以做了预算制 + 按 sha 缓存，跑不完下次接着跑）；
    - 用 Workers AI **逐条读提交信息，在既有的 13 个类型里重判提交类型**（前缀 + 关键词那套会判错，

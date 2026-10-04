@@ -10,6 +10,7 @@ import json
 import os
 import re
 import subprocess
+import urllib.request
 
 WORK = os.path.dirname(os.path.abspath(__file__))   # 脚本所在目录：本地是 _worklog-dev，CI 里就是仓库目录
 REPOS = [
@@ -25,6 +26,12 @@ REPOS = [
 ME_EMAILS = {"105136492+DelicateDuck582@users.noreply.github.com", "2708857263@qq.com",
              "132802091+ahappyduck@users.noreply.github.com"}
 FS, RS = "\x1f", "\x1e"          # 字段分隔 / 记录分隔
+
+# Worker 地址（与 _gen_worklog.py 同一个环境变量）：classify.json / ports.json 都从它取。
+# 采集时顺路把 AI 的移植来源判定（/ports.json）拉一份存到下面这个文件（跟 worklog-kinds.json 并排），
+# 拉不到就当没有：移植来源仍只看提交信息里的自述。
+API_BASE = os.environ.get("WORKLOG_API") or "https://api-www.delicateduck.xyz"
+PORTS_FILE = os.path.join(WORK, "worklog-ports.json")
 
 # 写法别名 → 统一类型（约定式提交里常见的各种写法，都被收敛到同一批分类）
 KIND_ALIAS = {
@@ -128,6 +135,75 @@ def classify(subject, files=None):
     return "other"
 
 
+# 「从 X 分支选择性移植」的自述：这类提交与来源分支没有父子关系，merge-base 推不出拓扑，只能读提交信息
+PORT_PATTERNS = (
+    re.compile(r"(?:从|自|来自)\s*([A-Za-z0-9_./-]{2,40})(?:\s*分支)?[^。\n]{0,30}?(?:选择性)?移植"),
+    re.compile(r"(?:cherry-?pick(?:ed)?|backport(?:ed)?)\s+(?:from\s+)?([A-Za-z0-9_./-]{2,40})", re.I),
+)
+
+
+def branch_hits(name, branches):
+    """把一个分支名对回仓库真实分支名：完全同名 / 路径尾段同名 / 名字是某分支的一部分。
+    命中恰好一条才算数（0 条＝对不上，多条＝说不清是哪个分支，都不认）。"""
+    name = (name or "").strip("。，,（）()")
+    if not name:
+        return []
+    return [b for b in branches if b == name or b.endswith("/" + name) or name in b]
+
+
+def port_from_branch(text, branches):
+    """提交信息里声明「从 X 分支移植」时，把 X 对回仓库真实分支名；对不上就不认。"""
+    for pat in PORT_PATTERNS:
+        m = pat.search(text)
+        if not m:
+            continue
+        hits = branch_hits(m.group(1), branches)
+        if len(hits) == 1:
+            return hits[0]
+    return ""
+
+
+AI_PORTS_FETCHED = False                          # /ports.json 有没有真的取回来（空表也算取到）
+
+
+def fetch_ai_ports():
+    """Worker 的 /ports.json：sha → AI 判定的移植来源分支名。
+
+    每次采集顺路取一份存到 worklog-ports.json（跟 worklog-kinds.json 并排，都不进仓库）；
+    取不到 / 解析失败 / 一条都没有 → 返回空表：移植来源仍只看提交信息自述（纯本地那套）。"""
+    global AI_PORTS_FETCHED
+    url = API_BASE.rstrip("/") + "/ports.json"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "pub-homepage-collect"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+    except Exception as err:                      # 网络 / HTTP / JSON：任何失败都静默跳过
+        print("AI 移植判定拉取失败（忽略，仍只看提交信息自述）：%s" % err)
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    AI_PORTS_FETCHED = True
+    try:
+        with open(PORTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(raw, f, ensure_ascii=False, indent=1)
+    except OSError as err:
+        print("AI 移植判定写盘失败（忽略）：%s" % err)
+    return {sha: name for sha, name in raw.items() if isinstance(name, str) and name.strip()}
+
+
+AI_PORTS = fetch_ai_ports()                       # 下面 port_from 判定用：本地正则优先，它只补位
+AI_PORT_USED = set()                              # 真被采纳的 sha（补位成功的那几条，打日志用）
+
+
+def ai_port_from(sha, branches):
+    """AI 判定的移植来源（补位）：本地正则没判出来时才问它；分支名对不上真实分支同样不认。"""
+    hits = branch_hits(AI_PORTS.get(sha), branches)
+    if len(hits) == 1:
+        AI_PORT_USED.add(sha)
+        return hits[0]
+    return ""
+
+
 out = {"repos": []}
 for cfg in REPOS:
     repo = cfg["repo"]
@@ -137,7 +213,7 @@ for cfg in REPOS:
 
     for br in heads:
         raw = git(repo, "log", br, "--pretty=format:%H" + FS + "%h" + FS + "%an" + FS + "%ae" + FS
-                  + "%aI" + FS + "%P" + FS + "%s" + RS)
+                  + "%aI" + FS + "%P" + FS + "%s" + FS + "%b" + RS)
         mine, total = 0, 0
         last_any_date = ""                       # 该分支最早的提交日期：log 按新→旧遍历，循环结束后它就是最早那条
         for rec in raw.split(RS):
@@ -148,6 +224,7 @@ for cfg in REPOS:
             if len(parts) < 7:
                 continue
             sha, short, an, ae, date, parents, subject = parts[:7]
+            body = parts[7] if len(parts) > 7 else ""     # 正文：移植来源声明在标题尾或正文里
             last_any_date = date[:10]
             total += 1
             if cfg.get("ignore_numeric") and re.fullmatch(r"\d+", subject.strip() or ""):
@@ -157,9 +234,13 @@ for cfg in REPOS:
             mine += 1
             c = commits.get(sha)
             if c is None:
+                # 移植来源在这里一次判好：本地正则（提交信息自述）优先，AI 判定补位，两者都要能
+                # 对回真实分支名；写进 JSON 的 port_from 由 _gen_worklog.py 画连线用
                 c = commits[sha] = dict(sha=sha, short=short, name=an, email=ae, date=date,
                                         day=date[:10], parents=parents.split(),
-                                        subject=subject, kind=classify(subject), branches=[])
+                                        subject=subject, kind=classify(subject), branches=[],
+                                        port_from=(port_from_branch(subject + "\n" + body, heads)
+                                                   or ai_port_from(sha, heads)))
             if br not in c["branches"]:
                 c["branches"].append(br)
         days = sorted(commits[s]["day"] for s in commits if br in commits[s]["branches"])
@@ -249,7 +330,8 @@ for cfg in REPOS:
     out["repos"].append(dict(
         key=cfg["key"], url=cfg["url"], main=cfg["main"], branches=branch_meta,
         commits=[{k: c[k] for k in ("sha", "short", "date", "day", "subject", "kind",
-                                    "branches", "files", "ext", "dirs", "parents")} for c in mine_list],
+                                    "branches", "files", "ext", "dirs", "parents",
+                                    "port_from")} for c in mine_list],
         stats=dict(total_branch_commits=sum(b["commits_total"] for b in branch_meta),
                    mine=len(mine_list), months=dict(sorted(months.items())),
                    kinds=dict(kinds.most_common()), exts=dict(exts.most_common(10)),
@@ -264,6 +346,14 @@ if os.path.commonpath([path, WORK]) != WORK:
     raise SystemExit("采集产物路径越界：%s" % path)
 with open(path, "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False, indent=1)
+
+if AI_PORTS:
+    print("AI 移植判定：Worker 给了 %d 条，合并 %d 条（本地正则优先，对不上真实分支的不认）"
+          % (len(AI_PORTS), len(AI_PORT_USED)))
+elif AI_PORTS_FETCHED:
+    print("AI 移植判定：/ports.json 还是空表（Worker 的 classify 跑完就会填上），移植来源仍只看提交信息自述")
+else:
+    print("AI 移植判定：没取到 /ports.json（忽略），移植来源仍只看提交信息自述")
 
 for r in out["repos"]:
     s = r["stats"]
