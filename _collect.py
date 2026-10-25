@@ -19,7 +19,7 @@ REPOS = [
     dict(key="SPlayer", repo=os.path.join(WORK, "SPlayer.git"), main="dev",
          url="https://github.com/DelicateDuck582/SPlayer"),
     dict(key="ciyuan-translate", repo=os.path.join(WORK, "ciyuan-translate.git"), main="main",
-         url="https://github.com/lolicon-daisuki/ciyuan-translate",
+         url="https://github.com/DelicateDuck582/ciyuan-translate",
          # 纯数字标题是占位提交，不计数；提交按全局署名规则计入
          ignore_numeric=True),
 ]

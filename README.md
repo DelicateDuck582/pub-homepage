@@ -44,7 +44,7 @@ DelicateDuck582 的个人主页：纯静态站点（HTML / CSS / JS），没有�
 # 1) 准备三个裸库（放在本目录下，脚本按这个名字找）
 git clone --bare --filter=blob:none https://github.com/DelicateDuck582/cloud-mail.git cloud-mail.git
 git clone --bare --filter=blob:none https://github.com/DelicateDuck582/SPlayer.git SPlayer.git
-git clone --bare --filter=blob:none https://github.com/lolicon-daisuki/ciyuan-translate.git ciyuan-translate.git
+git clone --bare --filter=blob:none https://github.com/DelicateDuck582/ciyuan-translate.git ciyuan-translate.git
 
 # 2) 采集 + 渲染
 python _collect.py         # 写出 worklog-data.json

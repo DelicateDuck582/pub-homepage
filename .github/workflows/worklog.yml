@@ -47,7 +47,7 @@ jobs:
           if [ -n "$SRC_TOKEN" ]; then auth="x-access-token:${SRC_TOKEN}@"; fi    # 公开仓库可以不带 token
           git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/cloud-mail.git" cloud-mail.git
           git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/SPlayer.git" SPlayer.git
-          git clone --bare --filter=blob:none "https://github.com/lolicon-daisuki/ciyuan-translate.git" ciyuan-translate.git
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/ciyuan-translate.git" ciyuan-translate.git
 
       - name: 采集（原始时区、改动目录、分支分叉关系都算在本地这套口径里）
         run: python _collect.py

@@ -3,19 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1b1b19">
-<meta name="description" content="DelicateDuck582 的个人主页">
-<title>首页 | DelicateDuck582</title>
-<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48 64x64 128x128">
+<meta name="theme-color" content="#101010">
+<meta name="description" content="DelicateDuck582 — 学生党 · 纯 AI 开发者。四个小东西全部自己部署：按 ⌘K，指挥一切。">
+<title>DelicateDuck582 — 指挥台</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="icon" type="image/png" sizes="256x256" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <style>
-  /* ============================================================
-     主题变量：单一深色（极简科技黑）
-     ============================================================ */
-  /* 拉丁子集 Inter 变量字体：英文数字走 Inter，中文回退系统字体 */
   @font-face {
     font-family: "Inter var";
     font-style: normal;
@@ -24,599 +19,432 @@
     src: url("inter-var.woff2") format("woff2");
   }
   :root {
-    color-scheme: dark;
-    --bg: #1b1b19;
-    --card: #292927;
-    --card-hover: #31312f;
-    --fg: #faf9f5;
-    --muted: #b0aea5;
-    --border: rgba(250, 249, 245, 0.12);
-    --border-strong: rgba(250, 249, 245, 0.26);
+    --bg: #101010;
+    --panel: #171717;
+    --fg: #ededed;
+    --muted: #9b9b9b;
+    --faint: #666;
+    --line: rgba(237, 237, 237, 0.09);
     --accent: #cc785c;
-    --accent-soft: rgba(204, 120, 92, 0.18);
-    --shadow-card: 0 0 0 1px rgba(250, 249, 245, 0.10), 0 4px 12px rgba(0, 0, 0, 0.25);
-    --shadow-card-hover: 0 0 0 1px rgba(243, 198, 188, 0.30), 0 12px 24px rgba(0, 0, 0, 0.40);
-    --brand-bg: #f1f5f9;
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --accent-soft: rgba(204, 120, 92, 0.16);
+    --mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
+    --sans: "Inter var", "Inter", -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+            "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
-  ::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); color: var(--fg); }
-  /* ---------- 基础重置 ---------- */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html {
-    height: 100%; background: var(--bg); scroll-behavior: smooth;
-    -webkit-text-size-adjust: 100%;   /* iOS 横屏不再自动放大正文 */
-    text-size-adjust: 100%;
-  }
+  html, body { height: 100%; }
   body {
-    min-height: 100vh;
-    min-height: 100dvh;               /* 手机地址栏伸缩时不会多出一段空白 */
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: "Inter var", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
-                 "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "HarmonyOS Sans SC",
-                 "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
-    font-size: 15px;
-    line-height: 1.6;
+    background: var(--bg); color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.7;
+    overflow: hidden;
     -webkit-font-smoothing: antialiased;
-    -webkit-tap-highlight-color: transparent;   /* 触屏点击不要系统灰块 */
   }
+  ::selection { background: var(--accent-soft); }
   a { color: inherit; text-decoration: none; }
-  /* 可点元素消除移动端点击延迟 / 双击缩放 */
-  a, button, .chip, .card { touch-action: manipulation; }
-  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
-  img { display: block; max-width: 100%; }
-  ul { list-style: none; }
-  h1, h2, h3 { font-weight: 650; line-height: 1.3; letter-spacing: -0.005em; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
-
-  /* 统一的线性图标（lucide 风格） */
-  .icon {
-    width: 16px; height: 16px; flex: none;
-    fill: none; stroke: currentColor; stroke-width: 1.8;
-    stroke-linecap: round; stroke-linejoin: round;
-  }
-  .icon-lg { width: 18px; height: 18px; }
-
-  /* 统一的等宽字体（提交哈希 / 域名 / 分支名） */
-  code, kbd, .card-foot {
-    font-family: "JetBrains Mono", "Cascadia Code", "Cascadia Mono", "SF Mono", ui-monospace,
-                 Menlo, Consolas, "Liberation Mono", monospace;
-    font-variant-ligatures: none;
+  kbd {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 6px; padding: 2px 7px; line-height: 1.4;
   }
 
-  /* ---------- 顶部导航条 ---------- */
+  /* ---------- 应用壳 ---------- */
+  .shell { height: 100dvh; display: flex; flex-direction: column; }
   .topbar {
-    position: sticky; top: 0; z-index: 30;
-    display: flex; align-items: center;
-    height: 56px; padding: 0 16px;
-    background: var(--bg);
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
+    flex: none; display: flex; align-items: center; gap: 12px;
+    height: 52px; padding: 0 20px;
+    border-bottom: 1px solid var(--line);
   }
-  .topbar-inner {
-    width: 100%; max-width: 1024px; margin: 0 auto;
-    display: flex; align-items: center; gap: 8px;
+  .topbar .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+  .topbar .brand { font-size: 13px; font-weight: 650; letter-spacing: .01em; }
+  .topbar .env { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .08em; }
+  .topbar .right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .topbar .clock { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+  .topbar .kbd-open { cursor: pointer; display: inline-flex; gap: 4px; }
+  .topbar .kbd-open kbd { cursor: pointer; }
+
+  /* 舞台：内容面板 */
+  .stage {
+    flex: 1; overflow: auto;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 24px;
+    position: relative;
   }
-  .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
-  .breadcrumb .crumb-sep { opacity: 0.5; }
-  .breadcrumb .current { color: var(--fg); font-weight: 600; }
-  .topbar-nav { display: flex; align-items: center; gap: 2px; margin-left: 8px; }
-  .nav-link {
-    display: inline-flex; align-items: center; gap: 7px;
-    height: 32px; padding: 0 11px; border-radius: 7px;
-    font-size: 13.5px; color: var(--muted); white-space: nowrap;
-    transition: background-color 0.18s ease, color 0.18s ease;
+  .stage::before {
+    content: "⌘K"; position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 800;
+    font-size: min(34vw, 300px); letter-spacing: -0.04em;
+    color: transparent; -webkit-text-stroke: 1.5px var(--line);
+    pointer-events: none; user-select: none;
+    transition: opacity .4s ease;
   }
-  .nav-link.is-active { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); font-weight: 600; }
-  .nav-link.is-active > .icon { color: var(--accent); }
-  .topbar .spacer { flex: 1; }
-  /* ---------- 主内容区 ---------- */
-  .content {
-    flex: 1 0 auto;
-    width: 100%; max-width: 1024px;
-    margin: 0 auto;
-    padding: 36px 32px 56px;
+  .stage.busy::before { opacity: 0; }
+  .view { max-width: 560px; width: 100%; animation: vin .4s var(--ease); }
+  @keyframes vin { from { opacity: 0; transform: translateY(12px) scale(.99); } }
+  .view .kick { font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--accent); }
+  .view h1 {
+    margin-top: 14px;
+    font-size: clamp(30px, 5vw, 46px); font-weight: 750; letter-spacing: -0.015em; line-height: 1.25;
+  }
+  .view h1 kbd { font-size: .55em; vertical-align: .12em; }
+  .view h1 em { font-style: normal; color: var(--accent); }
+  .view .sub { margin-top: 16px; color: var(--muted); font-size: 14.5px; max-width: 30em; }
+  .view .sub b { color: var(--fg); font-weight: 600; }
+  .view .hintkeys { margin-top: 34px; display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12.5px; flex-wrap: wrap; }
+
+  .mono-block {
+    margin-top: 18px; font-family: var(--mono); font-size: 13px; line-height: 2.1;
+    color: var(--muted);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .mono-block b { color: var(--accent); font-weight: 500; }
+  .mono-block .w { color: var(--fg); }
+
+  .rows { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .row {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    transition: background .15s ease;
+  }
+  .row:last-child { border-bottom: 0; }
+  a.row:hover { background: var(--accent-soft); }
+  .row .t { font-weight: 600; font-size: 14.5px; }
+  .row .d { color: var(--muted); font-size: 12.5px; }
+  .row .u { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .06em; white-space: nowrap; }
+
+  .statusline {
+    position: fixed; left: 20px; bottom: 14px;
+    font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .08em;
+  }
+  .statusline b { color: var(--accent); font-weight: 500; }
+  .cmd-open-mobile {
+    position: fixed; right: 18px; bottom: 14px; z-index: 30;
+    border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+    font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
+    cursor: pointer; display: none; align-items: center; gap: 8px;
   }
 
-  /* 首屏标题 + 按钮 */
-  .hero { display: flex; flex-direction: column; gap: 18px; }
-  .hero-title { font-size: clamp(26px, 4.4vw, 42px); font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
-  .hero-title .chip-link {
-    display: inline-flex; align-items: center;
-    margin: 0 6px 0 0; padding: 1px 14px 3px;   /* 位于句首，左侧不留缩进，标题与下方按钮左对齐 */
-    border-radius: 999px;
-    background: var(--accent-soft); color: var(--accent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
-    transition: transform 0.22s var(--ease-out);
+  /* ---------- 命令面板 ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(8, 8, 8, 0.55);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center;
+    padding: 14vh 20px 20px;
   }
-  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    height: 40px; padding: 0 18px; border-radius: 8px;
-    font-size: 14px; font-weight: 500;
-    transition: transform 0.2s var(--ease-out), background-color 0.2s ease, box-shadow 0.2s ease;
+  [data-theme="light"] .overlay { background: rgba(60, 50, 40, 0.25); }
+  .overlay.on { display: flex; animation: fadein .15s ease; }
+  @keyframes fadein { from { opacity: 0; } }
+  .palette {
+    width: 100%; max-width: 560px;
+    background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 40px 90px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03);
+    overflow: hidden;
+    animation: pop .22s var(--ease);
   }
-  .btn-primary { background: var(--fg); color: var(--bg); }
-  .btn-outline { box-shadow: inset 0 0 0 1px var(--border-strong); }
-  .btn-outline > .icon { transition: transform 0.2s var(--ease-out); }
+  @keyframes pop { from { opacity: 0; transform: scale(.98) translateY(-6px); } }
+  .palette .search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .palette .search .mag { color: var(--faint); font-size: 14px; }
+  .palette input {
+    flex: 1; border: 0; outline: 0; background: transparent;
+    font: inherit; font-size: 15px; color: var(--fg);
+    caret-color: var(--accent);
+  }
+  .palette input::placeholder { color: var(--faint); }
+  .palette .esc kbd { font-size: 10px; }
+  .palette .list { max-height: 320px; overflow: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--faint) transparent; }
+  .palette .list::-webkit-scrollbar { width: 6px; }
+  .palette .list::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 3px; }
+  .palette .list::-webkit-scrollbar-track { background: transparent; }
+  .palette .group { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--faint); padding: 10px 12px 4px; }
+  .cmd {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 9px; cursor: pointer;
+    color: var(--muted); font-size: 14px;
+  }
+  .cmd .ic { width: 20px; text-align: center; color: var(--faint); flex: none; }
+  .cmd mark { background: none; color: var(--fg); font-weight: 650; }
+  .cmd .kbdhint { margin-left: auto; opacity: 0; }
+  .cmd.sel { background: var(--accent-soft); color: var(--fg); }
+  .cmd.sel .ic { color: var(--accent); }
+  .cmd.sel .kbdhint { opacity: 1; }
+  .palette .foot {
+    display: flex; gap: 16px; align-items: center;
+    padding: 10px 16px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--faint);
+  }
+  .palette .foot .r { margin-left: auto; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; }
+  .palette .empty { padding: 26px 16px; text-align: center; color: var(--faint); font-size: 13.5px; }
 
-  /* 品牌大卡片（极简科技黑：扁平深底 + 细点阵 + 右上角冷光） */
-  .hero-card {
-    position: relative; isolation: isolate; overflow: hidden;
-    margin-top: 26px; padding: 26px 28px; border-radius: 12px;
-    background-color: var(--card);
-    background-image:
-      radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 46%),
-      radial-gradient(circle, color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px);
-    background-size: auto, 22px 22px;
-    box-shadow: var(--shadow-card);
-    transition: box-shadow 0.4s var(--ease-out);
+  /* toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%) translateY(8px);
+    z-index: 80; background: var(--accent); color: #14100d;
+    font-size: 13px; font-weight: 600; padding: 9px 18px; border-radius: 999px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease, transform .3s var(--ease);
   }
-  .glow {
-    position: absolute; inset: 0; z-index: 1; pointer-events: none;
-    opacity: 0; transition: opacity 0.3s ease;
-    background: radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 0%),
-      color-mix(in srgb, var(--fg) 8%, transparent), var(--accent-soft) 38%, transparent 70%);
-  }
-  .hero-card-body { position: relative; z-index: 2; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-  .hero-logo {
-    width: 76px; height: 76px; border-radius: 14px; object-fit: cover;
-    background: var(--brand-bg);
-    box-shadow: 0 0 0 1px var(--border), 0 10px 22px rgba(0, 0, 0, 0.45);
-  }
-  .hero-card-text { min-width: 0; }
-  .brand-name { font-size: clamp(21px, 2.6vw, 28px); font-weight: 700; letter-spacing: -0.01em; }
-  .brand-en { margin-top: 4px; font-size: 14.5px; }
-  .brand-zh { margin-top: 2px; font-size: 13.5px; color: var(--muted); }
-  /* ---------- 内容分区 ---------- */
-  .section { margin-top: 46px; scroll-margin-top: 76px; }
-  .section-title { font-size: 20px; }
-  .section-desc { margin-top: 8px; max-width: 70ch; font-size: 14.5px; color: var(--muted); }
+  .toast.on { opacity: 1; transform: translateX(-50%); }
 
-  /* 三卡片网格 */
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-  .card {
-    display: flex; flex-direction: column; gap: 8px;
-    height: 100%;
-    padding: 18px; border-radius: 10px;
-    background: var(--card);
-    box-shadow: var(--shadow-card);
-    transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out), background-color 0.24s ease;
-  }
-  .card-icon {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 8px;
-    background: var(--accent-soft); color: var(--accent);
-  }
-  .card-icon .icon { width: 17px; height: 17px; }
-  .card-title { font-size: 14.5px; }
-  .card-desc { font-size: 13px; color: var(--muted); }
-  .card-foot {
-    display: flex; align-items: center; gap: 6px;
-    margin-top: auto; padding-top: 4px;
-    font-size: 11.5px; color: var(--muted);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .card-foot .icon { width: 13px; height: 13px; margin-left: auto; color: var(--accent); opacity: 0.85; }
-  .card-foot-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  a.card .card-title { transition: color 0.2s ease; }
-
-  /* 链接 chips（社交链接行） */
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-  .chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    height: 34px; padding: 0 13px; border-radius: 999px;
-    font-size: 13px;
-    background: var(--card);
-    box-shadow: inset 0 0 0 1px var(--border);
-    transition: transform 0.2s var(--ease-out), background-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  .chip .icon { width: 14px; height: 14px; color: var(--muted); }
-
-  /* ---------- 页脚 ---------- */
-  .site-footer {
-    width: 100%; max-width: 1024px;
-    margin: auto auto 0;
-    padding: 18px 32px 26px;
-    border-top: 1px solid var(--border);
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-    gap: 8px 18px;
-    font-size: 12.5px; color: var(--muted);
-  }
-  .foot-credits { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-left: auto; }
-  .foot-credit {
-    display: inline-flex; align-items: center; gap: 5px;
-    white-space: nowrap;
-    transition: color 0.18s ease;
-  }
-  .foot-credit .icon { width: 12px; height: 12px; stroke-width: 2; }
-  /* ---------- 悬浮「回到顶部」 ---------- */
-  .to-top {
-    position: fixed; right: 20px; bottom: 20px; z-index: 20;
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 40px; height: 40px; border-radius: 10px;
-    background: var(--card); color: var(--muted);
-    box-shadow: var(--shadow-card);
-    opacity: 0; pointer-events: none; transform: translateY(8px);
-    transition: opacity 0.25s ease, transform 0.25s var(--ease-out), background-color 0.2s ease, color 0.2s ease;
-  }
-  .to-top.is-visible { opacity: 1; pointer-events: auto; transform: none; }
-
-  /* ---------- 入场动画 ---------- */
-  @keyframes fade-up {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: none; }
-  }
-  .hero, .hero-card, .section { animation: fade-up 0.6s var(--ease-out) both; }
-  .hero { animation-delay: 0.03s; }
-  .hero-card { animation-delay: 0.10s; }
-  #about { animation-delay: 0.16s; }
-  #projects { animation-delay: 0.22s; }
-  #social { animation-delay: 0.28s; }
-
-  /* ---------- 响应式 ---------- */
-  @media (max-width: 1080px) {
-    .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-  @media (max-width: 900px) {
-    .content { padding: 28px 20px 44px; }
-    .site-footer { padding: 16px 20px 22px; }
-    .section { margin-top: 38px; }
-  }
-  /* 触屏设备（手机、iPad 这类宽屏触屏）：点击目标普遍放大，跟屏宽无关。
-     条件写两个：pointer: coarse 是平板/手机的主流向，hover: none 兜底（部分环境只报后者）。 */
-  @media (hover: none), (pointer: coarse) {
-    .nav-link { height: 40px; padding: 0 12px; }
-    .chip { height: 40px; padding: 0 15px; }
-    .btn { height: 44px; }
-    .to-top { width: 44px; height: 44px; }
-  }
-
-  /* 手机（≤640px）：导航不隐藏而是可横向滑动，触摸目标放大到 40~44px，并让出刘海 / 底部横条安全区 */
   @media (max-width: 640px) {
-    .topbar { padding-left: calc(12px + env(safe-area-inset-left)); padding-right: calc(12px + env(safe-area-inset-right)); }
-    .topbar-inner { gap: 4px; }
-    .breadcrumb { font-size: 13px; white-space: nowrap; }   /* 窄屏导航占位多，别把「首页」挤成两行 */
-    .breadcrumb .crumb-sep, .breadcrumb .current { display: none; }   /* 窄屏只留「首页」，宽度让给导航 */
-    .topbar-nav { flex-wrap: nowrap; margin-left: 2px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
-    .topbar-nav::-webkit-scrollbar { display: none; }
-    .nav-link { height: 40px; padding: 0 10px; font-size: 13px; }
-    .content { padding: 22px 16px 40px; }
-    .site-footer {
-      padding: 14px calc(16px + env(safe-area-inset-left)) calc(18px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-right));
-      font-size: 13px;
-    }
-    .foot-credits { margin-left: 0; }
-    .section { margin-top: 34px; scroll-margin-top: 68px; }
-    .card-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    .card { padding: 16px; }
-    .card-title { font-size: 15px; }
-    .card-desc { font-size: 13.5px; }
-    .card-foot { font-size: 12.5px; }
-    .hero-card { margin-top: 22px; padding: 18px; border-radius: 12px; }
-    .hero-logo { width: 64px; height: 64px; border-radius: 12px; }
-    .brand-name { font-size: 22px; }
-    .btn { flex: 1 1 auto; justify-content: center; height: 44px; }
-    .chip { height: 40px; padding: 0 14px; font-size: 13.5px; }
-    .to-top {
-      width: 44px; height: 44px;
-      right: calc(14px + env(safe-area-inset-right));
-      bottom: calc(16px + env(safe-area-inset-bottom));
-    }
+    .topbar .env, .topbar .clock { display: none; }
+    .stage { padding: 24px 18px; align-items: flex-start; padding-top: 12vh; }
+    .cmd-open-mobile { display: inline-flex; }
+    .overlay { padding: 10vh 12px 12px; }
+    .palette .list { max-height: 46vh; }
   }
-
-  /* 小屏（≤380px：iPhone SE / 老安卓）：再收一档留白 */
-  @media (max-width: 380px) {
-    .topbar { height: 52px; }
-    .hero-title { font-size: 23px; }
-    .brand-name { font-size: 20px; }
-    .brand-en { font-size: 13.5px; }
-    .card-grid { gap: 10px; }
-    .card { padding: 14px; }
-    .btn { flex: 1 1 100%; }
-    .section { scroll-margin-top: 64px; }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    .hero, .hero-card, .section { animation: none; }
-    *, *::before, *::after { transition-duration: 0.001ms !important; }
-  }
-
-  /* ---------- 悬停效果只在「精确指针」设备生效 ----------
-     触屏点一下之后 :hover 会一直粘住（卡片保持抬高 + 强调色），
-     所以统一收进这个媒体查询；触摸设备改用下面的 :active 即时反馈。 */
-  @media (hover: hover) and (pointer: fine) {
-    .breadcrumb a:hover { color: var(--fg); }
-    .nav-link:hover { background: var(--card-hover); color: var(--fg); }
-    .hero-title .chip-link:hover { transform: translateY(-2px); }
-    .btn-primary:hover { transform: translateY(-1px); }
-    .btn-outline:hover { background: var(--card); transform: translateY(-1px); }
-    .btn-outline:hover > .icon { transform: translateX(3px); }
-    .hero-card:hover { box-shadow: var(--shadow-card-hover); }
-    .hero-card:hover .glow { opacity: 1; }
-    .card:hover {
-      transform: translateY(-3px);
-      background: var(--card-hover);
-      box-shadow: var(--shadow-card-hover);
-    }
-    a.card:hover .card-title { color: var(--accent); }
-    .chip:hover {
-      transform: translateY(-1px);
-      background: var(--card-hover);
-      box-shadow: inset 0 0 0 1px var(--border-strong);
-    }
-    .foot-credit:hover { color: var(--fg); }
-    .to-top:hover { background: var(--card-hover); color: var(--fg); }
-  }
-
-  /* 触屏：按下即给反馈，不依赖 hover */
-  @media (hover: none), (pointer: coarse) {
-    .nav-link:active { background: var(--card-hover); color: var(--fg); }
-    .hero-title .chip-link:active { transform: scale(0.97); }
-    .card:active { background: var(--card-hover); box-shadow: var(--shadow-card-hover); }
-    .chip:active { background: var(--card-hover); box-shadow: inset 0 0 0 1px var(--border-strong); }
-    .btn:active { transform: scale(0.985); }
-    .to-top:active { background: var(--card-hover); color: var(--fg); }
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 </style>
 </head>
-<body>
+<body data-theme="dark">
 
-  <!-- ============ 顶部导航条 ============ -->
-  <header class="topbar">
-    <div class="topbar-inner">
-      <nav class="breadcrumb" aria-label="面包屑">
-        <a href="#home">首页</a>
-        <span class="crumb-sep" aria-hidden="true">/</span>
-        <span class="current">DelicateDuck582</span>
-      </nav>
+  <div class="shell">
+    <header class="topbar">
+      <span class="dot"></span>
+      <span class="brand">DelicateDuck582</span>
+      <span class="env">COMMAND · CIALLO.SALE</span>
+      <span class="right">
+        <span class="clock" id="clock">--:--</span>
+        <span class="kbd-open" id="kbdopen" title="打开命令面板"><kbd>⌘</kbd><kbd>K</kbd></span>
+      </span>
+    </header>
 
-      <nav class="topbar-nav" aria-label="页面导航">
-        <a class="nav-link" href="#about" data-nav="about">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 20.5v-1.6a4.4 4.4 0 0 0-4.4-4.4H9.4A4.4 4.4 0 0 0 5 18.9v1.6"/><circle cx="12" cy="7.5" r="3.9"/></svg>
-          <span>关于</span>
-        </a>
-        <a class="nav-link" href="#projects" data-nav="projects">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg>
-          <span>项目</span>
-        </a>
-        <a class="nav-link" href="#social" data-nav="social">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4.5 4.5 0 0 0 6.4 0l2.4-2.4a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M13.4 10.6a4.5 4.5 0 0 0-6.4 0l-2.4 2.4a4.5 4.5 0 0 0 6.4 6.4L12.4 18"/></svg>
-          <span>社交链接</span>
-        </a>
-        <a class="nav-link" href="worklog.html">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          <span>工作日志</span>
-        </a>
-      </nav>
+    <main class="stage" id="stage"><div class="view" id="view"></div></main>
 
-      <span class="spacer"></span>
+    <p class="statusline">STATUS <b>●</b> OPERATIONAL · ciallo.sale · 无人能规定你该做什么</p>
+    <button class="cmd-open-mobile" id="mobileopen">⌘K 命令</button>
+  </div>
+
+  <!-- 命令面板 -->
+  <div class="overlay" id="overlay">
+    <div class="palette" role="dialog" aria-label="命令面板">
+      <div class="search">
+        <span class="mag">⌕</span>
+        <input id="q" type="text" placeholder="输入命令或搜索……" autocomplete="off" spellcheck="false">
+        <span class="esc"><kbd>esc</kbd></span>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="foot">
+        <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+        <span><kbd>↵</kbd> 执行</span>
+        <span class="r">DUCK CMD · ciallo.sale</span>
+      </div>
     </div>
-  </header>
+  </div>
 
-  <!-- ============ 主体内容 ============ -->
-  <main class="content" id="home">
-    <!-- 1. 首屏标题与按钮 -->
-    <section class="hero">
-      <h1 class="hero-title"><a class="chip-link" href="#projects">Fork</a> 只是起点，重新定义才是目的。</h1>
-      <div class="btn-row">
-        <a class="btn btn-primary" href="https://github.com/DelicateDuck582/" target="_blank" rel="noopener">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21.5v-3.4a3.9 3.9 0 0 0-1-3 4.5 4.5 0 0 0 3.4-4.4 4.7 4.7 0 0 0-1.2-3.3 4.4 4.4 0 0 0-.1-3.3s-1 0-2.8 1.6a11.3 11.3 0 0 0-6.4 0C5.1 4.1 4.1 4.1 4.1 4.1a4.4 4.4 0 0 0-.1 3.3 4.7 4.7 0 0 0-1.2 3.3 4.5 4.5 0 0 0 3.4 4.4 3.9 3.9 0 0 0-1 3v3.4"/><path d="M9 18.6c-3.6 1.6-4-1.6-5.6-1.6"/></svg>
-          <span>关注我</span>
-        </a>
-        <a class="btn btn-outline" href="worklog.html">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-          <span>工作日志</span>
-        </a>
-        <a class="btn btn-outline" href="#about">
-          <span>开始</span>
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h14"/><path d="m13 6.5 5.5 5.5L13 17.5"/></svg>
-        </a>
-      </div>
-    </section>
-    <!-- 2. 品牌卡片 -->
-    <section class="hero-card">
-      <div class="glow" aria-hidden="true"></div>
-      <div class="hero-card-body">
-        <img class="hero-logo" src="logo.png" alt="DelicateDuck582 的头像" width="76" height="76" decoding="async">
-        <div class="hero-card-text">
-          <h2 class="brand-name">DelicateDuck582</h2>
-          <p class="brand-en">No one can tell you what you can or cannot do.</p>
-          <p class="brand-zh">无人能规定你该做什么，不该做什么。</p>
-        </div>
-      </div>
-    </section>
+  <div class="toast" id="toast"></div>
 
-    <!-- 3. 关于（标题 + 说明 + 三张卡片） -->
-    <section class="section" id="about">
-      <h2 class="section-title">学生党，纯 AI 开发者。</h2>
-      <p class="section-desc">也不知道开发什么，几乎就是在 fork 里修改自己需要的功能。写得不多，但每次改动都先自己跑通再拿出来用。</p>
+<script>
+(function () {
+  'use strict';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      <ul class="card-grid">
-        <li class="card">
-          <span class="card-icon">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="18.5" r="2.6"/><circle cx="6" cy="5" r="2.6"/><circle cx="18" cy="5" r="2.6"/><path d="M18 7.6v1.2a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7.6"/><path d="M12 10.8v5.1"/></svg>
-          </span>
-          <h3 class="card-title">Fork 驱动</h3>
-          <p class="card-desc">需要什么功能，就在别人的轮子上改，不重复造轮子，只补自己缺的那一块。</p>
-        </li>
-        <li class="card">
-          <span class="card-icon">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 1.8 4.9 4.9 1.8-4.9 1.8L12 16.9l-1.8-4.9-4.9-1.8 4.9-1.8L12 3.5Z"/><path d="M19 16.5v4.2"/><path d="M16.9 18.6h4.2"/></svg>
-          </span>
-          <h3 class="card-title">纯 AI 开发</h3>
-          <p class="card-desc">不背语法细节，把需求讲清楚，剩下的交给 AI 一起完成，边做边学。</p>
-        </li>
-        <li class="card">
-          <span class="card-icon">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.6 12.4 2.4 2.4 4.4-4.9"/></svg>
-          </span>
-          <h3 class="card-title">跑通再发</h3>
-          <p class="card-desc">每次提交前自己先用一遍，能用、稳定，再谈好不好看，尽量不发半成品。</p>
-        </li>
-      </ul>
-    </section>
-    <!-- 4. 项目（三张可点击卡片） -->
-    <section class="section" id="projects">
-      <h2 class="section-title">项目</h2>
-      <p class="section-desc">自己部署、自己改的一些小东西，都放在这里。</p>
+  /* ---------- 视图 ---------- */
+  var VIEWS = {
+    home: '<p class="kick">COMMAND · 指挥台</p>' +
+          '<h1>按 <kbd>⌘K</kbd>，<br>指挥<em>一切</em>。</h1>' +
+          '<p class="sub">我是 <b>DelicateDuck582</b>，学生党 · 纯 AI 开发者。这个主页没有一个可以点的东西——只有一个命令面板。<b>随便敲个键</b>试试。</p>' +
+          '<p class="hintkeys">或者 <kbd>↑</kbd><kbd>↓</kbd> 翻命令 · <kbd>↵</kbd> 执行 · 敲 <b>G</b> 去项目 · 敲 <b>W</b> 去日志</p>',
+    about: '<p class="kick">PAGE · 关于</p>' +
+           '<h1>先跑通，<br>再见人。</h1>' +
+           '<div class="mono-block"><b>$</b> whoami<br><span class="w">DelicateDuck582</span> —— 学生党 · 纯 AI 开发者<br><br>不知道该开发什么，就把自己需要的<br>从别人的轮子上改出来。<br><br><b>$</b> cat motto.txt<br>No one can tell you what you can or cannot do.<br>无人能规定你该做什么，不该做什么。</div>',
+    projects: '<p class="kick">PAGE · 项目</p>' +
+              '<h1>四个小东西。</h1>' +
+              '<p class="sub">自己部署、自己改，每一件都能点开就用。</p>' +
+              '<div class="rows">' +
+              '<a class="row" href="https://music.ciallo.sale" target="_blank" rel="noopener"><span class="t">SPlayer</span><span class="d">在线音乐播放器</span><span class="u">MUSIC.CIALLO.SALE ↗</span></a>' +
+              '<a class="row" href="https://github.com/DelicateDuck582/ciyuan-translate" target="_blank" rel="noopener"><span class="t">ciyuan-translate</span><span class="d">安卓沉浸式翻译</span><span class="u">GITHUB ↗</span></a>' +
+              '<a class="row" href="https://github.com/DelicateDuck582/cloud-mail" target="_blank" rel="noopener"><span class="t">CloudMail 自修改版</span><span class="d">改到顺手为止的云邮箱</span><span class="u">GITHUB ↗</span></a>' +
+              '<a class="row" href="https://vn.ciallo.sale" target="_blank" rel="noopener"><span class="t">galgame-patch</span><span class="d">VN 资源站与补丁整理</span><span class="u">VN.CIALLO.SALE ↗</span></a>' +
+              '</div>',
+    log: '<p class="kick">PAGE · 工作日志</p>' +
+         '<h1>按天更新。</h1>' +
+         '<p class="sub">三个仓库、所有分支、由我署名的提交，数据由 git 历史自动生成，每天 21:40 云端重渲染。</p>' +
+         '<div class="rows"><a class="row" href="worklog.html"><span class="t">工作日志 ↗</span><span class="d">统计卡 · 提交类型 · 热力图 · 分支拓扑 · 时间线</span><span class="u">OPEN ↗</span></a></div>',
+    contact: '<p class="kick">PAGE · 联络</p>' +
+             '<h1>两个入口。</h1>' +
+             '<p class="sub">找我从这里就好，其他都是冒充的。</p>' +
+             '<div class="rows">' +
+             '<a class="row" href="https://github.com/DelicateDuck582/" target="_blank" rel="noopener"><span class="t">GitHub</span><span class="d">DelicateDuck582</span><span class="u">OPEN ↗</span></a>' +
+             '<a class="row" href="mailto:contact@ciallo.sale"><span class="t">Email</span><span class="d">contact@ciallo.sale</span><span class="u">MAIL ↗</span></a>' +
+             '</div>'
+  };
 
-      <ul class="card-grid">
-        <li>
-          <a class="card" href="https://music.ciallo.sale" target="_blank" rel="noopener">
-            <span class="card-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.6 16 12l-6 3.4V8.6Z"/></svg>
-            </span>
-            <h3 class="card-title">SPlayer</h3>
-            <p class="card-desc">在线音乐播放器，搜索、播放、歌单一条龙。</p>
-            <span class="card-foot">
-              <span class="card-foot-text">music.ciallo.sale</span>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5h5v5"/><path d="M19.5 4.5 11 13"/><path d="M19 14v4.4a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 18.4V6.6A1.6 1.6 0 0 1 5.6 5H10"/></svg>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://github.com/lolicon-daisuki/ciyuan-translate" target="_blank" rel="noopener">
-            <span class="card-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-            </span>
-            <h3 class="card-title">ciyuan-translate</h3>
-            <p class="card-desc">安卓沉浸式翻译工具：字幕、漫画、阅读器全场景翻译。</p>
-            <span class="card-foot">
-              <span class="card-foot-text">lolicon-daisuki/ciyuan-translate</span>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5h5v5"/><path d="M19.5 4.5 11 13"/><path d="M19 14v4.4a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 18.4V6.6A1.6 1.6 0 0 1 5.6 5H10"/></svg>
-            </span>
-          </a>
-        </li>
-        <li>
-          <a class="card" href="https://github.com/DelicateDuck582/cloud-mail" target="_blank" rel="noopener">
-            <span class="card-icon">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.6" y="4.6" width="18.8" height="14.8" rx="2.6"/><path d="m3.8 7.6 7.4 5.2a1.6 1.6 0 0 0 1.6 0l7.4-5.2"/></svg>
-            </span>
-            <h3 class="card-title">CloudMail 自修改版</h3>
-            <p class="card-desc">自己改过的 CloudMail 云邮箱，按需要调整功能后再部署。</p>
-            <span class="card-foot">
-              <span class="card-foot-text">DelicateDuck582/cloud-mail</span>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4.5h5v5"/><path d="M19.5 4.5 11 13"/><path d="M19 14v4.4a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 18.4V6.6A1.6 1.6 0 0 1 5.6 5H10"/></svg>
-            </span>
-          </a>
-        </li>
-      </ul>
-    </section>
-    <!-- 5. 社交 / 快捷链接 -->
-    <section class="section" id="social">
-      <h2 class="section-title">社交链接</h2>
-      <p class="section-desc">只有两个入口：GitHub 和邮箱，找我从这里就好。</p>
+  var viewEl = document.getElementById('view');
+  var stage = document.getElementById('stage');
+  function show(name) {
+    stage.classList.add('busy');
+    viewEl.innerHTML = VIEWS[name];
+    requestAnimationFrame(function () { requestAnimationFrame(function () { stage.classList.remove('busy'); }); });
+  }
+  show('home');
 
-      <ul class="chips">
-        <li>
-          <a class="chip" href="https://github.com/DelicateDuck582/" target="_blank" rel="noopener" title="打开 GitHub 主页">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21.5v-3.4a3.9 3.9 0 0 0-1-3 4.5 4.5 0 0 0 3.4-4.4 4.7 4.7 0 0 0-1.2-3.3 4.4 4.4 0 0 0-.1-3.3s-1 0-2.8 1.6a11.3 11.3 0 0 0-6.4 0C5.1 4.1 4.1 4.1 4.1 4.1a4.4 4.4 0 0 0-.1 3.3 4.7 4.7 0 0 0-1.2 3.3 4.5 4.5 0 0 0 3.4 4.4 3.9 3.9 0 0 0-1 3v3.4"/><path d="M9 18.6c-3.6 1.6-4-1.6-5.6-1.6"/></svg>
-            <span>GitHub</span>
-          </a>
-        </li>
-        <li>
-          <a class="chip" href="mailto:contact@ciallo.sale" title="发送邮件">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.6" y="4.6" width="18.8" height="14.8" rx="2.6"/><path d="m3.8 7.6 7.4 5.2a1.6 1.6 0 0 0 1.6 0l7.4-5.2"/></svg>
-            <span>Email</span>
-          </a>
-        </li>
-      </ul>
-    </section>
-  </main>
+  /* ---------- 命令表 ---------- */
+  var CMDS = [
+    { g: '页面', ic: '◉', label: '回到首页', kw: 'home home 首页 开始', run: function () { show('home'); } },
+    { g: '页面', ic: '📄', label: '关于我', kw: 'about whoami 自我介绍 关于', run: function () { show('about'); } },
+    { g: '页面', ic: '📁', label: '项目', kw: 'projects 项目 作品 splayer ciyuan', run: function () { show('projects'); } },
+    { g: '页面', ic: '📝', label: '工作日志', kw: 'log 日志 blog worklog', run: function () { show('log'); } },
+    { g: '页面', ic: '📮', label: '联络', kw: 'contact 联络 邮箱 email', run: function () { show('contact'); } },
+    { g: '动作', ic: '⧉', label: '复制邮箱 contact@ciallo.sale', kw: 'copy email 复制 邮箱', run: function () {
+        copyText('contact@ciallo.sale', '邮箱已复制 ✓');
+      } },
+    { g: '动作', ic: '⌘', label: '复制座右铭', kw: 'motto copy 座右铭', run: function () {
+        copyText('No one can tell you what you can or cannot do.', '座右铭已复制 ✓');
+      } },
+    { g: '动作', ic: '↗', label: '打开 GitHub', kw: 'github 打开', run: function () {
+        window.open('https://github.com/DelicateDuck582/', '_blank', 'noopener');
+        toast('已在新标签打开 GitHub ↗');
+      } },
+    { g: '动作', ic: '◑', label: '切换浅色 / 深色', kw: 'theme light dark 主题 切换', run: function () {
+        var b = document.body;
+        var next = b.dataset.theme === 'dark' ? 'light' : 'dark';
+        b.dataset.theme = next;
+        toast(next === 'light' ? '已切换到纸白主题' : '已切换到深色主题');
+      } },
+    { g: '彩蛋', ic: '🦆', label: 'quack', kw: 'duck quack 鸭 嘎', run: function () { toast('（๑´ㅂ`๑) quack～'); } },
+    { g: '彩蛋', ic: '⏻', label: '关机（假装的）', kw: 'shutdown 关机', run: function () {
+        toast('这台指挥台没有电源键。');
+      } }
+  ];
 
-  <!-- ============ 页脚 ============ -->
-  <footer class="site-footer">
-    <span>© <span id="year">2026</span> DelicateDuck582</span>
-    <span class="foot-credits">
-      <span class="foot-credit">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
-        <span>Designed by DeepSeek</span>
-      </span>
-      <span class="foot-credit">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/><path d="m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18"/><path d="m2.3 2.3 7.286 7.286"/><circle cx="11" cy="11" r="2"/></svg>
-        <span>Logo by DeepSeek</span>
-      </span>
-    </span>
-  </footer>
+  /* ---------- 面板 ---------- */
+  var overlay = document.getElementById('overlay');
+  var list = document.getElementById('list');
+  var input = document.getElementById('q');
+  var open = false, sel = 0, filtered = [];
 
-  <!-- 悬浮回到顶部 -->
-  <button class="to-top" type="button" aria-label="回到顶部">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.5v-14"/><path d="m6.5 11 5.5-5.5L17.5 11"/></svg>
-  </button>
-  <script>
-    (function () {
-      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function render(q) {
+    q = (q || '').trim().toLowerCase();
+    filtered = CMDS.map(function (c) {
+      var hay = (c.label + ' ' + c.kw).toLowerCase();
+      var score = -1;
+      if (!q) score = 0;
+      else if (c.label.toLowerCase().indexOf(q) === 0) score = 2;
+      else if (hay.indexOf(q) >= 0) score = 1;
+      return { c: c, score: score };
+    }).filter(function (x) { return x.score >= 0; })
+      .sort(function (a, b) { return b.score - a.score; })
+      .map(function (x) { return x.c; });
 
-      /* ---------- 滚动高亮顶栏导航 ---------- */
-      var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav-link[data-nav]'));
-      var spyTargets = navLinks
-        .map(function (link) { return document.getElementById(link.dataset.nav); })
-        .filter(Boolean);
-
-      function setActive(id) {
-        navLinks.forEach(function (link) {
-          var on = link.dataset.nav === id;
-          link.classList.toggle('is-active', on);
-          if (on) link.setAttribute('aria-current', 'page');
-          else link.removeAttribute('aria-current');
-        });
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty">没有这个命令。' + esc(q) + ' —— 但没关系，无人能规定你该输入什么。</div>';
+      return;
+    }
+    var html = '', lastG = null;
+    filtered.forEach(function (c, i) {
+      if (c.g !== lastG) { html += '<div class="group">' + c.g + '</div>'; lastG = c.g; }
+      var label = esc(c.label);
+      if (q) {
+        var at = c.label.toLowerCase().indexOf(q);
+        if (at >= 0) label = esc(c.label.slice(0, at)) + '<mark>' + esc(c.label.slice(at, at + q.length)) + '</mark>' + esc(c.label.slice(at + q.length));
       }
+      html += '<div class="cmd' + (i === sel ? ' sel' : '') + '" data-i="' + i + '">' +
+              '<span class="ic">' + c.ic + '</span><span>' + label + '</span>' +
+              '<span class="kbdhint"><kbd>↵</kbd></span></div>';
+    });
+    list.innerHTML = html;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function move(d) {
+    if (!filtered.length) return;
+    sel = (sel + d + filtered.length) % filtered.length;
+    render(input.value);
+    var el = list.querySelector('.cmd.sel');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+  function exec(i) {
+    var c = filtered[i];
+    if (!c) return;
+    closePalette();
+    c.run();
+  }
+  function openPalette() {
+    if (open) return;
+    open = true; sel = 0;
+    input.value = '';
+    render('');
+    overlay.classList.add('on');
+    setTimeout(function () { input.focus(); }, 0);
+  }
+  function closePalette() {
+    open = false;
+    overlay.classList.remove('on');
+    input.blur();
+  }
+  input.addEventListener('input', function () { sel = 0; render(input.value); });
+  overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) closePalette(); });
+  list.addEventListener('click', function (e) {
+    var el = e.target.closest('.cmd');
+    if (el) exec(parseInt(el.dataset.i, 10));
+  });
+  document.getElementById('kbdopen').addEventListener('click', openPalette);
+  document.getElementById('mobileopen').addEventListener('click', openPalette);
 
-      function updateActive() {
-        var probe = window.scrollY + 140;
-        var current = '';
-        spyTargets.forEach(function (el) {
-          if (el.getBoundingClientRect().top + window.scrollY <= probe) current = el.id;
-        });
-        var scrollable = document.documentElement.scrollHeight - window.innerHeight > 8;
-        if (scrollable && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4 && spyTargets.length) {
-          current = spyTargets[spyTargets.length - 1].id;
-        }
-        setActive(current);
+  /* 键盘：全局拦截 */
+  var MODIFIERS = { Shift: 1, Control: 1, Alt: 1, Meta: 1, CapsLock: 1, Tab: 1, Escape: 1 };
+  document.addEventListener('keydown', function (e) {
+    if (!open) {
+      if (e.key === 'Escape') return;
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault(); openPalette(); return;
       }
+      if (MODIFIERS[e.key] || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+      /* 任意键唤起；字母键顺带作为快捷过滤 */
+      e.preventDefault();
+      openPalette();
+      if (/^[a-z0-9]$/i.test(e.key)) { input.value = e.key; sel = 0; render(input.value); }
+      return;
+    }
+    /* 面板内 */
+    if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); exec(sel); }
+  });
 
-      window.addEventListener('scroll', updateActive, { passive: true });
-      window.addEventListener('resize', updateActive);
-      updateActive();
-
-      /* ---------- 回到顶部 ---------- */
-      var toTop = document.querySelector('.to-top');
-      if (toTop) {
-        toTop.addEventListener('click', function () {
-          window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
-        });
-        var toggleToTop = function () {
-          toTop.classList.toggle('is-visible', window.scrollY > 360);
-        };
-        window.addEventListener('scroll', toggleToTop, { passive: true });
-        toggleToTop();
-      }
-
-      /* ---------- 品牌卡片：鼠标跟随光晕 ---------- */
-      var card = document.querySelector('.hero-card');
-      if (card && !reduced) {
-        card.addEventListener('mousemove', function (e) {
-          var rect = card.getBoundingClientRect();
-          card.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
-          card.style.setProperty('--my', (e.clientY - rect.top) + 'px');
-        });
-      }
-
-      /* ---------- 页脚年份 ---------- */
-      var year = document.getElementById('year');
-      if (year) year.textContent = String(new Date().getFullYear());
-    })();
-  </script>
+  /* ---------- toast / clipboard / 时钟 ---------- */
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 1900);
+  }
+  function copyText(text, ok) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      var ok2 = false;
+      try { ok2 = document.execCommand('copy'); } catch (err) {}
+      ta.remove();
+      toast(ok2 ? ok : '复制失败——手动抄一份吧：' + text);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast(ok); }, fallback);
+    } else fallback();
+  }
+  var clockEl = document.getElementById('clock');
+  function tick() {
+    var d = new Date();
+    clockEl.textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  setInterval(tick, 1000); tick();
+})();
+</script>
 </body>
 </html>

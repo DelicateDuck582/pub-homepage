@@ -30,7 +30,7 @@ BUILD_YEAR = str(int(BUILD_YEAR_ENV or BUILD_AT[:4]))
 TIMELINE_AUTO = not BUILD_YEAR_ENV
 DATA = os.path.join(HERE, "worklog-data.json")
 FONT_FILE = os.path.join(HERE, "inter-var.woff2")
-INDEX = os.path.join(SITE, "index.html")
+INDEX = os.path.join(SITE, "_worklog_shell.html")
 SITE_R = os.path.realpath(SITE)
 OUT = os.path.realpath(os.environ.get("WORKLOG_OUT") or os.path.join(SITE, "worklog.html"))
 # 产物只允许落在站点目录内：realpath 归一化后做包含校验，WORKLOG_OUT 被配到目录外直接报错
