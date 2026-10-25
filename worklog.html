@@ -760,7 +760,7 @@
     </div>
   </header>
 
-  <main class="content" id="home"><div class="wl-fresh" id="wlFresh" data-build="2026-10-25T15:26:37+09:00" hidden></div>
+  <main class="content" id="home"><div class="wl-fresh" id="wlFresh" data-build="2026-10-25T17:13:14+00:00" hidden></div>
     <!-- 1. 首屏 -->
     <section class="hero">
       <h1 class="hero-title">工作日志</h1>
@@ -1783,7 +1783,7 @@
 
       /* ---------- 工作日志：打开时先去 Worker 拉一次（有更新的整页就换掉；否则从 KV 取新提交） ---------- */
       (function () {
-        var api = 'https://api-www.delicateduck.xyz', mine = '2026-10-25T15:26:37+09:00', KIND_CN = {"feat": "新功能", "fix": "修复", "refactor": "重构", "merge": "合并", "docs": "文档", "chore": "杂项", "style": "样式", "perf": "性能", "test": "测试", "build": "构建", "ci": "CI", "revert": "回滚", "other": "其它"}, REPO = 'DelicateDuck582/pub-homepage';
+        var api = 'https://api-www.delicateduck.xyz', mine = '2026-10-25T17:13:14+00:00', KIND_CN = {"feat": "新功能", "fix": "修复", "refactor": "重构", "merge": "合并", "docs": "文档", "chore": "杂项", "style": "样式", "perf": "性能", "test": "测试", "build": "构建", "ci": "CI", "revert": "回滚", "other": "其它"}, REPO = 'DelicateDuck582/pub-homepage';
         if (!api) return;
         var base = api.replace(/[/]+$/, '');
         var host = document.getElementById('wlFresh');
