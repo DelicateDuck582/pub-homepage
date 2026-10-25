@@ -760,7 +760,7 @@
     </div>
   </header>
 
-  <main class="content" id="home"><div class="wl-fresh" id="wlFresh" data-build="2026-10-25T04:03:24+00:00" hidden></div>
+  <main class="content" id="home"><div class="wl-fresh" id="wlFresh" data-build="2026-10-25T15:26:37+09:00" hidden></div>
     <!-- 1. 首屏 -->
     <section class="hero">
       <h1 class="hero-title">工作日志</h1>
@@ -934,8 +934,24 @@
         /* 这里不提前 return：按需从云端加载回来的日组也要能筛，哪怕首屏一条内嵌都没有
            （年初刚开年、或者为了自测强制了往年当构建年时就是这样） */
         var state = { repo: 'all', branch: 'all', kind: 'all' };
+        var KIND_CN = {"feat": "新功能", "fix": "修复", "refactor": "重构", "merge": "合并", "docs": "文档", "chore": "杂项", "style": "样式", "perf": "性能", "test": "测试", "build": "构建", "ci": "CI", "revert": "回滚", "other": "其它"};
+        /* 仓库 × 类型计数（构建期算好）：时间线按年从云端拉，DOM 里不是全量，现数不出来。
+           点仓库 chip 时把类型 chip 的括号数字换成这一仓库的；矩阵里没有的键按 0 显示。 */
+        var REPO_KIND = {"__all__":{"feat":65,"fix":94,"merge":12,"docs":49,"chore":18,"style":3,"perf":9,"build":1,"ci":2},"cloud-mail":{"feat":48,"fix":62,"merge":11,"docs":40,"chore":7,"style":2,"perf":3,"ci":2},"SPlayer":{"feat":16,"fix":31,"merge":1,"docs":8,"chore":11,"style":1,"perf":6,"build":1},"ciyuan-translate":{"feat":1,"fix":1,"docs":1}};
         var branchGroup = document.querySelector('.filters-branch');
         var branchBtns = Array.prototype.slice.call(document.querySelectorAll('[data-filter="branch"]'));
+
+        function syncKindCounts() {                    /* 类型 chip 的计数跟着仓库走；选中态 / 筛选项不动 */
+          var counts = REPO_KIND[state.repo === 'all' ? '__all__' : state.repo] || {};
+          Array.prototype.slice.call(document.querySelectorAll('[data-filter="kind"]')).forEach(function (b) {
+            var k = b.dataset.value;
+            if (!k || k === 'all') return;             /* 「全部类型」本来就没有计数 */
+            var text = (KIND_CN[k] || k) + '（' + (counts[k] || 0) + '）';
+            var last = b.lastChild;
+            if (last && last.nodeType === 3) last.nodeValue = text;   /* 只换图标后那截文字，<i> 不动 */
+            else b.appendChild(document.createTextNode(text));
+          });
+        }
 
         function syncBranch() {                        /* 选了具体仓库，才把「全部分支」和这一仓库的分支按钮动画显示出来 */
           var all = (state.repo === 'all');
@@ -1134,12 +1150,13 @@
             Array.prototype.slice.call(document.querySelectorAll('[data-filter="' + group + '"]'))
               .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
             state[group] = btn.dataset.value;
-            if (group === 'repo') syncBranch();
+            if (group === 'repo') { syncBranch(); syncKindCounts(); }
             apply();
           });
         });
 
         syncBranch();              /* 初始没选具体仓库：分支那组先收着 */
+        syncKindCounts();          /* 初始计数 = 全部仓库（与构建期写死的数字一致） */
       })();
 
       /* ---------- 工作日志：点热力图小方格 → 平滑滚到时间线并展开那一天 ---------- */
@@ -1766,7 +1783,7 @@
 
       /* ---------- 工作日志：打开时先去 Worker 拉一次（有更新的整页就换掉；否则从 KV 取新提交） ---------- */
       (function () {
-        var api = 'https://api-www.delicateduck.xyz', mine = '2026-10-25T04:03:24+00:00', KIND_CN = {"feat": "新功能", "fix": "修复", "refactor": "重构", "merge": "合并", "docs": "文档", "chore": "杂项", "style": "样式", "perf": "性能", "test": "测试", "build": "构建", "ci": "CI", "revert": "回滚", "other": "其它"}, REPO = 'DelicateDuck582/pub-homepage';
+        var api = 'https://api-www.delicateduck.xyz', mine = '2026-10-25T15:26:37+09:00', KIND_CN = {"feat": "新功能", "fix": "修复", "refactor": "重构", "merge": "合并", "docs": "文档", "chore": "杂项", "style": "样式", "perf": "性能", "test": "测试", "build": "构建", "ci": "CI", "revert": "回滚", "other": "其它"}, REPO = 'DelicateDuck582/pub-homepage';
         if (!api) return;
         var base = api.replace(/[/]+$/, '');
         var host = document.getElementById('wlFresh');

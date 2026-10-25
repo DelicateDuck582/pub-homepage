@@ -8,7 +8,8 @@
 #       另外这里自己也有一份 21:40 的定时兜底（cron 用 UTC）。
 #
 # 需要准备：
-#   1) 站点仓库根目录要有：index.html（模板）、_collect.py、_gen_worklog.py、inter-var.woff2、worklog.html（产物）
+#   1) 站点仓库根目录要有：index.html（模板）、inter-var.woff2、worklog.html（产物）；
+#      pipeline/ 下放：_collect.py、_gen_worklog.py、_worklog_shell.html（以及三个源仓库的裸克隆）
 #   2) 地址与口令（可选，放哪边都行）：
 #        WORKLOG_API              Worker 地址。不配就用代码里的默认值（自定义域名），一样能用
 #        WORKLOG_PUBLISH_TOKEN     Worker 的发布口令；不配就只提交回仓库、不推 Worker
@@ -45,12 +46,12 @@ jobs:
         run: |
           auth=""
           if [ -n "$SRC_TOKEN" ]; then auth="x-access-token:${SRC_TOKEN}@"; fi    # 公开仓库可以不带 token
-          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/cloud-mail.git" cloud-mail.git
-          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/SPlayer.git" SPlayer.git
-          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/ciyuan-translate.git" ciyuan-translate.git
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/cloud-mail.git" pipeline/cloud-mail.git
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/SPlayer.git" pipeline/SPlayer.git
+          git clone --bare --filter=blob:none "https://${auth}github.com/DelicateDuck582/ciyuan-translate.git" pipeline/ciyuan-translate.git
 
       - name: 采集（原始时区、改动目录、分支分叉关系都算在本地这套口径里）
-        run: python _collect.py
+        run: python pipeline/_collect.py
 
       - name: 取回类型判定（公开 GET，不需要口令）；有口令时顺带推数据并补判新提交
         env:
@@ -60,7 +61,7 @@ jobs:
           # API 地址兜底：没配就用生成脚本里的默认值对应的那个 Worker
           api="${API:-https://api-www.delicateduck.xyz}"
           # /classify.json 是公开的 GET：先取一份，保证页面不会因为「没配 Secrets」而丢掉 AI 判定
-          curl -fsS "$api/classify.json" -o worklog-kinds.json || true
+          curl -fsS "$api/classify.json" -o pipeline/worklog-kinds.json || true
           if [ -z "$TOKEN" ]; then
             echo '没配 WORKLOG_PUBLISH_TOKEN：跳过「推数据 + 补判新提交」，类型用上面取回的那份'
             exit 0
@@ -69,14 +70,14 @@ jobs:
           curl -fsS -X PUT "$api/publish/data.json" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
-            --data-binary @worklog-data.json > /dev/null || true
+            --data-binary @pipeline/worklog-data.json > /dev/null || true
           curl -fsS -X POST "$api/classify?batches=6" -H "Authorization: Bearer $TOKEN" > /dev/null || true
-          curl -fsS "$api/classify.json" -o worklog-kinds.json || true
+          curl -fsS "$api/classify.json" -o pipeline/worklog-kinds.json || true
 
       - name: 渲染整页（四处统计与图都在这一步产出）
         env:
           WORKLOG_API: ${{ vars.WORKLOG_API || secrets.WORKLOG_API }}
-        run: python _gen_worklog.py
+        run: python pipeline/_gen_worklog.py
 
       - name: 判断页面真的变了没有（抹掉构建时间戳再比，避免每天白提一次）
         id: diff
@@ -118,6 +119,6 @@ jobs:
           curl -fsS -X PUT "$api/publish/data.json" \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
-            --data-binary @worklog-data.json > /dev/null
+            --data-binary @pipeline/worklog-data.json > /dev/null
           echo '已发布到 Worker'
 

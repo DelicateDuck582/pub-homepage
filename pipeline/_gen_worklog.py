@@ -13,8 +13,9 @@ import math
 import os
 import re
 
-HERE = os.path.dirname(os.path.abspath(__file__))   # 脚本所在目录（本地 = _worklog-dev，CI 里 = 仓库目录）
-SITE = os.environ.get("WORKLOG_SITE") or HERE       # 默认写到脚本所在目录（克隆下来直接能跑）
+HERE = os.path.dirname(os.path.abspath(__file__))   # 脚本所在目录（归档在 pipeline/，本地与 CI 相同）
+# 站点目录：默认 = 脚本目录的父目录（脚本归档 pipeline/ 后默认就是仓库根，产物写在仓库根）
+SITE = os.environ.get("WORKLOG_SITE") or os.path.dirname(HERE)
 # 页面打开时会先去这个地址拉一次最新数据（/stage.json、/timeline.json）；留空则完全不联网（纯静态）
 # 环境变量优先，其次用下面这个默认值（部署 Worker 后填这里，见 _cf_deploy.md）
 API_BASE = os.environ.get("WORKLOG_API") or "https://api-www.delicateduck.xyz"
@@ -28,9 +29,9 @@ BUILD_AT = datetime.datetime.now().astimezone().isoformat(timespec="seconds")   
 BUILD_YEAR_ENV = (os.environ.get("WORKLOG_BUILD_YEAR") or "").strip()
 BUILD_YEAR = str(int(BUILD_YEAR_ENV or BUILD_AT[:4]))
 TIMELINE_AUTO = not BUILD_YEAR_ENV
-DATA = os.path.join(HERE, "worklog-data.json")
-FONT_FILE = os.path.join(HERE, "inter-var.woff2")
-INDEX = os.path.join(SITE, "_worklog_shell.html")
+DATA = os.path.join(HERE, "worklog-data.json")      # 采集产物与 _collect.py 同在脚本目录（pipeline/）
+FONT_FILE = os.path.join(SITE, "inter-var.woff2")   # 字体在站点根目录
+INDEX = os.path.join(HERE, "_worklog_shell.html")   # 外壳随脚本一起归档在 pipeline/
 SITE_R = os.path.realpath(SITE)
 OUT = os.path.realpath(os.environ.get("WORKLOG_OUT") or os.path.join(SITE, "worklog.html"))
 # 产物只允许落在站点目录内：realpath 归一化后做包含校验，WORKLOG_OUT 被配到目录外直接报错
@@ -1124,6 +1125,28 @@ branch_tables = "".join(
     for r in repos)
 
 
+def repo_kind_matrix(repos):
+    """仓库 × 提交类型计数：点仓库 chip 时，类型 chip 的计数跟着换成这一仓库的。
+
+    时间线是页面打开后按年从 Worker 拉的，DOM 里从来不是全量，页面自己数不出来 ——
+    所以在构建期把这张表算好嵌进筛选脚本。__all__ = 全部仓库（就是页面初始那组数）；
+    某个仓库没有的类型不写键，页面按 0 显示。"""
+    all_kinds = collections.Counter()
+    rows = []
+    for r in repos:
+        counts = r["stats"]["kinds"]
+        rows.append((r["key"], counts))
+        all_kinds.update(counts)
+    out = {"__all__": {k: all_kinds[k] for k in KIND_ORDER if all_kinds.get(k)}}
+    for key, counts in rows:
+        out[key] = {k: counts[k] for k in KIND_ORDER if counts.get(k)}
+    return out
+
+
+REPO_KIND_JSON = json.dumps(repo_kind_matrix(repos), ensure_ascii=False, separators=(",", ":")) \
+    .replace("</", "<\\/")          # 防止仓库名里出现 </script> 提前截断脚本
+
+
 def html_filters(repos):
     kinds = collections.Counter()
     for r in repos:
@@ -1446,8 +1469,24 @@ FILTER_JS = """
         /* 这里不提前 return：按需从云端加载回来的日组也要能筛，哪怕首屏一条内嵌都没有
            （年初刚开年、或者为了自测强制了往年当构建年时就是这样） */
         var state = { repo: 'all', branch: 'all', kind: 'all' };
+        var KIND_CN = __KIND_CN__;
+        /* 仓库 × 类型计数（构建期算好）：时间线按年从云端拉，DOM 里不是全量，现数不出来。
+           点仓库 chip 时把类型 chip 的括号数字换成这一仓库的；矩阵里没有的键按 0 显示。 */
+        var REPO_KIND = __REPO_KIND_MATRIX__;
         var branchGroup = document.querySelector('.filters-branch');
         var branchBtns = Array.prototype.slice.call(document.querySelectorAll('[data-filter="branch"]'));
+
+        function syncKindCounts() {                    /* 类型 chip 的计数跟着仓库走；选中态 / 筛选项不动 */
+          var counts = REPO_KIND[state.repo === 'all' ? '__all__' : state.repo] || {};
+          Array.prototype.slice.call(document.querySelectorAll('[data-filter="kind"]')).forEach(function (b) {
+            var k = b.dataset.value;
+            if (!k || k === 'all') return;             /* 「全部类型」本来就没有计数 */
+            var text = (KIND_CN[k] || k) + '（' + (counts[k] || 0) + '）';
+            var last = b.lastChild;
+            if (last && last.nodeType === 3) last.nodeValue = text;   /* 只换图标后那截文字，<i> 不动 */
+            else b.appendChild(document.createTextNode(text));
+          });
+        }
 
         function syncBranch() {                        /* 选了具体仓库，才把「全部分支」和这一仓库的分支按钮动画显示出来 */
           var all = (state.repo === 'all');
@@ -1646,12 +1685,13 @@ FILTER_JS = """
             Array.prototype.slice.call(document.querySelectorAll('[data-filter="' + group + '"]'))
               .forEach(function (b) { b.classList.toggle('is-on', b === btn); });
             state[group] = btn.dataset.value;
-            if (group === 'repo') syncBranch();
+            if (group === 'repo') { syncBranch(); syncKindCounts(); }
             apply();
           });
         });
 
         syncBranch();              /* 初始没选具体仓库：分支那组先收着 */
+        syncKindCounts();          /* 初始计数 = 全部仓库（与构建期写死的数字一致） */
       })();
 
       /* ---------- 工作日志：点热力图小方格 → 平滑滚到时间线并展开那一天 ---------- */
@@ -2502,6 +2542,7 @@ tpl = tpl.replace("</script>", FILTER_JS.replace("__WL_API__", API_BASE).replace
                   .replace("__KIND_CN__", json.dumps(KIND_LABEL, ensure_ascii=False))
                   .replace("__WL_REPO__", REPO_SLUG)
                   .replace("__WL_ARCHIVE__", ARCHIVE_JSON)
+                  .replace("__REPO_KIND_MATRIX__", REPO_KIND_JSON)
                   + "  </script>", 1)
 
 with open(OUT, "w", encoding="utf-8") as f:

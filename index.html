@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#101010">
-<meta name="description" content="DelicateDuck582 — 学生党 · 纯 AI 开发者。四个小东西全部自己部署：按 ⌘K，指挥一切。">
-<title>DelicateDuck582 — 指挥台</title>
+<meta name="description" content="DelicateDuck582 的主页没有链接，只有命令：按 ⌘K，指挥一切。">
+<title>指挥台 | DelicateDuck582</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -32,6 +32,16 @@
             "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
+  [data-theme="light"] {
+    --bg: #f4f1ea;
+    --panel: #fbf8f2;
+    --fg: #1d1a15;
+    --muted: #6f695e;
+    --faint: #a29a8b;
+    --line: rgba(29, 26, 21, 0.10);
+    --accent: #b3542f;
+    --accent-soft: rgba(179, 84, 47, 0.12);
+  }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -40,6 +50,7 @@
     font-size: 15px; line-height: 1.7;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
+    transition: background .3s ease, color .3s ease;
   }
   ::selection { background: var(--accent-soft); }
   a { color: inherit; text-decoration: none; }
@@ -47,14 +58,19 @@
     font-family: var(--mono); font-size: 11px; color: var(--muted);
     background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px;
     border-radius: 6px; padding: 2px 7px; line-height: 1.4;
+    transition: background-color .3s, color .3s, border-color .3s;
   }
 
   /* ---------- 应用壳 ---------- */
-  .shell { height: 100dvh; display: flex; flex-direction: column; }
+  .shell {
+    height: 100dvh; display: flex; flex-direction: column;
+    transition: transform .38s cubic-bezier(.4, 0, 1, 1), opacity .38s cubic-bezier(.4, 0, 1, 1);
+  }
   .topbar {
     flex: none; display: flex; align-items: center; gap: 12px;
     height: 52px; padding: 0 20px;
     border-bottom: 1px solid var(--line);
+    transition: background-color .3s, color .3s, border-color .3s;
   }
   .topbar .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
   .topbar .brand { font-size: 13px; font-weight: 650; letter-spacing: .01em; }
@@ -81,17 +97,121 @@
     transition: opacity .4s ease;
   }
   .stage.busy::before { opacity: 0; }
-  .view { max-width: 560px; width: 100%; animation: vin .4s var(--ease); }
-  @keyframes vin { from { opacity: 0; transform: translateY(12px) scale(.99); } }
+  .view { max-width: 560px; width: 100%; }
+  .view.leaving { opacity: 0; transform: translateY(10px) scale(.99); transition: opacity .17s ease, transform .17s ease; }
+  .view > * { animation: vfade .45s var(--ease) both; }
+  .view > *:nth-child(1) { animation-delay: .02s; }
+  .view > *:nth-child(2) { animation-delay: .08s; }
+  .view > *:nth-child(3) { animation-delay: .14s; }
+  .view > *:nth-child(4) { animation-delay: .2s; }
+  .view > *:nth-child(5) { animation-delay: .26s; }
+  @keyframes vfade { from { opacity: 0; transform: translateY(10px); } }
+  /* 日志视图的行顺次浮现 */
+  .view .row { animation: rowin .5s var(--ease) both; }
+  @keyframes rowin { from { opacity: 0; transform: translateX(14px); } }
+
+  /* ---------- worklog 全屏浮层 ---------- */
+  .worklog-veil {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(6, 6, 6, 0.55);
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s ease;
+  }
+  .worklog-veil.on { opacity: 1; pointer-events: auto; }
+  .worklog {
+    position: fixed; inset: 0; z-index: 61;
+    height: 100dvh;
+    display: grid; grid-template-rows: auto 1fr;
+    background: var(--bg);
+    opacity: 0; pointer-events: none;
+    transform: scale(.975) translateY(10px);
+    transition: opacity .38s cubic-bezier(.4, 0, 1, 1),
+                transform .38s cubic-bezier(.4, 0, 1, 1),
+                background-color .3s, border-color .3s;
+  }
+  .worklog[hidden], .worklog-veil[hidden] { display: none; }
+  .wlopen .worklog {
+    opacity: 1; pointer-events: auto; transform: none;
+    transition: opacity .44s var(--ease), transform .44s var(--ease),
+                background-color .3s, border-color .3s;
+  }
+  .wlopen .shell {
+    transform: scale(.96); opacity: .45;
+    transition: transform .44s var(--ease), opacity .44s var(--ease);
+  }
+  .wl-bar {
+    display: flex; align-items: center; gap: 10px;
+    height: 50px; padding: 0 10px 0 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+    transition: background-color .3s, color .3s, border-color .3s;
+  }
+  .wl-bar b { font-size: 13px; font-weight: 650; letter-spacing: .01em; }
+  .wl-hint { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .06em; }
+  .wl-pulse {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); opacity: .8;
+    animation: wlpulse 1.2s ease-in-out infinite;
+    transition: opacity .3s ease;
+  }
+  .worklog.loaded .wl-pulse { opacity: 0; animation: none; }
+  @keyframes wlpulse { 50% { opacity: .25; } }
+  .wl-x {
+    margin-left: auto; width: 40px; height: 40px; border-radius: 10px; flex: none;
+    display: grid; place-items: center;
+    color: var(--muted); background: transparent;
+    border: 1px solid var(--line); cursor: pointer;
+    font: inherit; font-size: 15px; line-height: 1;
+    transition: color .2s ease, border-color .2s ease, background-color .2s ease;
+  }
+  .wl-x:hover { color: var(--fg); border-color: rgba(204, 120, 92, .5); background: var(--accent-soft); }
+  .wl-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wl-x:active { transform: scale(.96); }
+  .wl-body { position: relative; min-height: 0; overflow: hidden; background: var(--bg); }
+  .wl-body iframe {
+    position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%;
+    border: 0; background: var(--bg);
+    opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+  }
+  .wl-body iframe.ready { opacity: 1; pointer-events: auto; }
+  .wl-skeleton {
+    position: absolute; inset: 0; z-index: 0;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 34px 28px;
+    background: var(--bg);
+    pointer-events: none;
+    transition: opacity .3s ease;
+  }
+  .wl-skeleton.gone { opacity: 0; }
+  .wl-skeleton span {
+    display: block; height: 14px; border-radius: 6px; opacity: .85;
+    background-color: var(--panel);
+    background-image: linear-gradient(100deg, transparent 25%, var(--line) 50%, transparent 75%);
+    background-size: 220% 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+  .wl-skeleton span:nth-child(1) { width: 68%; }
+  .wl-skeleton span:nth-child(2) { width: 92%; }
+  .wl-skeleton span:nth-child(3) { width: 61%; }
+  .wl-skeleton span:nth-child(4) { width: 81%; }
+  @keyframes shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
   .view .kick { font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--accent); }
   .view h1 {
     margin-top: 14px;
-    font-size: clamp(30px, 5vw, 46px); font-weight: 750; letter-spacing: -0.015em; line-height: 1.25;
+    font-size: clamp(30px, 5vw, 46px); font-weight: 750; letter-spacing: -0.02em; line-height: 1.25;
   }
   .view h1 kbd { font-size: .55em; vertical-align: .12em; }
   .view h1 em { font-style: normal; color: var(--accent); }
   .view .sub { margin-top: 16px; color: var(--muted); font-size: 14.5px; max-width: 30em; }
   .view .sub b { color: var(--fg); font-weight: 600; }
+  .view .sub .wl-link {
+    border: 0; background: none; padding: 0; margin: 0;
+    font: inherit; color: var(--accent); cursor: pointer;
+    transition: color .2s ease;
+  }
+  .view .sub .wl-link:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+  .view .sub .wl-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
   .view .hintkeys { margin-top: 34px; display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12.5px; flex-wrap: wrap; }
 
   .mono-block {
@@ -99,19 +219,28 @@
     color: var(--muted);
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
     padding: 18px 20px;
+    transition: background-color .3s, color .3s, border-color .3s;
   }
   .mono-block b { color: var(--accent); font-weight: 500; }
   .mono-block .w { color: var(--fg); }
 
-  .rows { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .rows {
+    margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    transition: background-color .3s, color .3s, border-color .3s;
+  }
   .row {
     display: flex; align-items: baseline; gap: 14px;
     padding: 14px 18px; border-bottom: 1px solid var(--line);
     background: var(--panel);
-    transition: background .15s ease;
+    transition: background-color .15s ease, color .3s ease, border-color .3s ease;
   }
   .row:last-child { border-bottom: 0; }
-  a.row:hover { background: var(--accent-soft); }
+  a.row:hover, button.row:hover { background: var(--accent-soft); }
+  button.row {
+    width: 100%; border: 0; border-bottom: 1px solid var(--line);
+    font: inherit; text-align: left; color: inherit; cursor: pointer;
+  }
+  button.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .row .t { font-weight: 600; font-size: 14.5px; }
   .row .d { color: var(--muted); font-size: 12.5px; }
   .row .u { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .06em; white-space: nowrap; }
@@ -119,6 +248,7 @@
   .statusline {
     position: fixed; left: 20px; bottom: 14px;
     font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .08em;
+    transition: background-color .3s, color .3s, border-color .3s;
   }
   .statusline b { color: var(--accent); font-weight: 500; }
   .cmd-open-mobile {
@@ -126,6 +256,7 @@
     border: 1px solid var(--line); background: var(--panel); color: var(--fg);
     font: inherit; font-size: 12.5px; padding: 9px 16px; border-radius: 10px;
     cursor: pointer; display: none; align-items: center; gap: 8px;
+    transition: background-color .3s, color .3s, border-color .3s;
   }
 
   /* ---------- 命令面板 ---------- */
@@ -138,7 +269,9 @@
   }
   [data-theme="light"] .overlay { background: rgba(60, 50, 40, 0.25); }
   .overlay.on { display: flex; animation: fadein .15s ease; }
+  .overlay.closing { display: flex; animation: fadeout .16s ease-in both; }
   @keyframes fadein { from { opacity: 0; } }
+  @keyframes fadeout { to { opacity: 0; } }
   .palette {
     width: 100%; max-width: 560px;
     background: var(--panel);
@@ -146,8 +279,11 @@
     box-shadow: 0 40px 90px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03);
     overflow: hidden;
     animation: pop .22s var(--ease);
+    transition: background-color .3s, color .3s, border-color .3s;
   }
+  .overlay.closing .palette { animation: popout .16s ease-in both; }
   @keyframes pop { from { opacity: 0; transform: scale(.98) translateY(-6px); } }
+  @keyframes popout { to { opacity: 0; transform: translateY(6px) scale(.985); } }
   .palette .search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
   .palette .search .mag { color: var(--faint); font-size: 14px; }
   .palette input {
@@ -166,6 +302,9 @@
     display: flex; align-items: center; gap: 12px;
     padding: 10px 12px; border-radius: 9px; cursor: pointer;
     color: var(--muted); font-size: 14px;
+    transition: background-color .12s ease, color .12s ease;
+    animation: fadein .26s var(--ease) both;
+    animation-delay: var(--cin, 0ms);
   }
   .cmd .ic { width: 20px; text-align: center; color: var(--faint); flex: none; }
   .cmd mark { background: none; color: var(--fg); font-weight: 650; }
@@ -191,6 +330,45 @@
   }
   .toast.on { opacity: 1; transform: translateX(-50%); }
 
+  /* ---------- Ciallo 彩蛋浮层 ---------- */
+  .ciallo {
+    position: fixed; inset: 0; z-index: 62;
+    display: grid; place-items: center;
+    padding: 20px;
+    background: rgba(6, 6, 6, 0.6);
+    opacity: 0;
+    transition: opacity .22s ease-in;
+  }
+  [data-theme="light"] .ciallo { background: rgba(60, 50, 40, 0.3); }
+  .ciallo[hidden] { display: none; }
+  .ciallo.on { opacity: 1; transition: opacity .38s var(--ease); }
+  .ciallo-card {
+    max-width: 100%;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 22px 24px 18px;
+    background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 40px 90px rgba(0, 0, 0, .5);
+    opacity: 0; transform: scale(.92);
+    transition: opacity .22s ease-in, transform .22s ease-in;
+  }
+  .ciallo.on .ciallo-card {
+    opacity: 1; transform: none;
+    transition: opacity .38s var(--ease), transform .38s var(--ease);
+  }
+  .ciallo-card img {
+    display: block; width: min(320px, 78vw); max-width: 100%; height: auto;
+    border-radius: 10px;
+  }
+  .ciallo-card img[hidden] { display: none; }
+  .ciallo-text { font-family: var(--mono); font-size: 14px; color: var(--accent); line-height: 1.4; }
+  .ciallo-hint { font-family: var(--mono); font-size: 10.5px; color: var(--faint); letter-spacing: .08em; }
+
+  /* 主题切换只在这段时间内启用颜色过渡 */
+  .theming * {
+    transition: background-color .35s ease, color .35s ease, border-color .35s ease, box-shadow .35s ease;
+  }
+
   @media (max-width: 640px) {
     .topbar .env, .topbar .clock { display: none; }
     .stage { padding: 24px 18px; align-items: flex-start; padding-top: 12vh; }
@@ -200,6 +378,9 @@
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    .wl-skeleton span { animation: none; }
+    .wl-pulse { animation: none; }
+    .cmd { animation: none; }
   }
 </style>
 </head>
@@ -209,7 +390,7 @@
     <header class="topbar">
       <span class="dot"></span>
       <span class="brand">DelicateDuck582</span>
-      <span class="env">COMMAND · CIALLO.SALE</span>
+      <span class="env">COMMAND · v582</span>
       <span class="right">
         <span class="clock" id="clock">--:--</span>
         <span class="kbd-open" id="kbdopen" title="打开命令面板"><kbd>⌘</kbd><kbd>K</kbd></span>
@@ -234,12 +415,38 @@
       <div class="foot">
         <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
         <span><kbd>↵</kbd> 执行</span>
-        <span class="r">DUCK CMD · ciallo.sale</span>
+        <span class="r">DUCK CMD v582</span>
       </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Ciallo 彩蛋 -->
+  <section class="ciallo" id="ciallo" role="dialog" aria-modal="true" aria-label="Ciallo" aria-hidden="true" hidden>
+    <div class="ciallo-card">
+      <img src="ciallo.avif" alt="Ciallo～(∠・ω&lt; )⌒★" onerror="this.hidden = true">
+      <p class="ciallo-text">Ciallo～(∠・ω&lt; )⌒★</p>
+      <p class="ciallo-hint">点击任意处 / esc 关闭</p>
+    </div>
+  </section>
+
+  <!-- worklog 全屏浮层 -->
+  <div class="worklog-veil" id="veil" hidden></div>
+  <section class="worklog" id="worklog" role="dialog" aria-modal="true" aria-label="工作日志" aria-hidden="true" hidden>
+    <div class="wl-bar">
+      <b>工作日志</b>
+      <span class="wl-hint">esc 关闭</span>
+      <span class="wl-pulse" aria-hidden="true"></span>
+      <button class="wl-x" id="dclose" aria-label="关闭工作日志" title="关闭（esc）">✕</button>
+    </div>
+    <div class="wl-body">
+      <iframe id="dframe" title="工作日志" loading="lazy"></iframe>
+      <div class="wl-skeleton" id="dskeleton" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+  </section>
 
 <script>
 (function () {
@@ -251,7 +458,7 @@
     home: '<p class="kick">COMMAND · 指挥台</p>' +
           '<h1>按 <kbd>⌘K</kbd>，<br>指挥<em>一切</em>。</h1>' +
           '<p class="sub">我是 <b>DelicateDuck582</b>，学生党 · 纯 AI 开发者。这个主页没有一个可以点的东西——只有一个命令面板。<b>随便敲个键</b>试试。</p>' +
-          '<p class="hintkeys">或者 <kbd>↑</kbd><kbd>↓</kbd> 翻命令 · <kbd>↵</kbd> 执行 · 敲 <b>G</b> 去项目 · 敲 <b>W</b> 去日志</p>',
+          '<p class="hintkeys">或者 <kbd>↑</kbd><kbd>↓</kbd> 翻命令 · <kbd>↵</kbd> 执行 · 敲 <b>G</b> 去项目 · 敲 <b>C</b> 去联络</p>',
     about: '<p class="kick">PAGE · 关于</p>' +
            '<h1>先跑通，<br>再见人。</h1>' +
            '<div class="mono-block"><b>$</b> whoami<br><span class="w">DelicateDuck582</span> —— 学生党 · 纯 AI 开发者<br><br>不知道该开发什么，就把自己需要的<br>从别人的轮子上改出来。<br><br><b>$</b> cat motto.txt<br>No one can tell you what you can or cannot do.<br>无人能规定你该做什么，不该做什么。</div>',
@@ -260,14 +467,16 @@
               '<p class="sub">自己部署、自己改，每一件都能点开就用。</p>' +
               '<div class="rows">' +
               '<a class="row" href="https://music.ciallo.sale" target="_blank" rel="noopener"><span class="t">SPlayer</span><span class="d">在线音乐播放器</span><span class="u">MUSIC.CIALLO.SALE ↗</span></a>' +
-              '<a class="row" href="https://github.com/DelicateDuck582/ciyuan-translate" target="_blank" rel="noopener"><span class="t">ciyuan-translate</span><span class="d">安卓沉浸式翻译</span><span class="u">GITHUB ↗</span></a>' +
+              '<a class="row" href="https://github.com/lolicon-daisuki/ciyuan-translate" target="_blank" rel="noopener"><span class="t">ciyuan-translate</span><span class="d">安卓沉浸式翻译</span><span class="u">GITHUB ↗</span></a>' +
               '<a class="row" href="https://github.com/DelicateDuck582/cloud-mail" target="_blank" rel="noopener"><span class="t">CloudMail 自修改版</span><span class="d">改到顺手为止的云邮箱</span><span class="u">GITHUB ↗</span></a>' +
               '<a class="row" href="https://vn.ciallo.sale" target="_blank" rel="noopener"><span class="t">galgame-patch</span><span class="d">VN 资源站与补丁整理</span><span class="u">VN.CIALLO.SALE ↗</span></a>' +
               '</div>',
-    log: '<p class="kick">PAGE · 工作日志</p>' +
+    log: '<p class="kick">PAGE · 日志</p>' +
          '<h1>按天更新。</h1>' +
-         '<p class="sub">三个仓库、所有分支、由我署名的提交，数据由 git 历史自动生成，每天 21:40 云端重渲染。</p>' +
-         '<div class="rows"><a class="row" href="worklog.html"><span class="t">工作日志 ↗</span><span class="d">统计卡 · 提交类型 · 热力图 · 分支拓扑 · 时间线</span><span class="u">OPEN ↗</span></a></div>',
+         '<p class="sub"><button type="button" class="wl-link" aria-label="打开工作日志">工作日志</button>：三仓库采集、时间线自动加载，流水账但有生命体征。<b>跳出框架 · 平滑载入</b></p>' +
+         '<div class="rows">' +
+         '<button type="button" class="row wl-row" aria-label="打开工作日志"><span class="t">工作日志</span><span class="d">点击直接弹出 · 平滑载入</span><span class="u">OPEN ↗</span></button>' +
+         '</div>',
     contact: '<p class="kick">PAGE · 联络</p>' +
              '<h1>两个入口。</h1>' +
              '<p class="sub">找我从这里就好，其他都是冒充的。</p>' +
@@ -279,19 +488,43 @@
 
   var viewEl = document.getElementById('view');
   var stage = document.getElementById('stage');
+  var currentView = '', viewTimer = null;
   function show(name) {
-    stage.classList.add('busy');
-    viewEl.innerHTML = VIEWS[name];
-    requestAnimationFrame(function () { requestAnimationFrame(function () { stage.classList.remove('busy'); }); });
+    if (name === currentView) return;
+    currentView = name;
+    clearTimeout(viewTimer);
+    viewEl.classList.remove('leaving');
+    function enter() {
+      stage.classList.add('busy');
+      viewEl.innerHTML = VIEWS[name];
+      requestAnimationFrame(function () { requestAnimationFrame(function () { stage.classList.remove('busy'); }); });
+    }
+    if (!viewEl.firstElementChild || reduced) { enter(); return; }
+    viewEl.classList.add('leaving');
+    viewTimer = setTimeout(function () {
+      viewEl.classList.remove('leaving');
+      enter();
+    }, 170);
   }
   show('home');
+
+  /* 日志视图入口：事件委托，适配 innerHTML 动态渲染 */
+  viewEl.addEventListener('click', function (e) {
+    var trigger = e.target.closest('.wl-link, .wl-row');
+    if (!trigger) return;
+    e.preventDefault();
+    openDrawer();
+  });
+
+  var themeTimer = null;
+  var metaTheme = document.querySelector('meta[name="theme-color"]');
 
   /* ---------- 命令表 ---------- */
   var CMDS = [
     { g: '页面', ic: '◉', label: '回到首页', kw: 'home home 首页 开始', run: function () { show('home'); } },
     { g: '页面', ic: '📄', label: '关于我', kw: 'about whoami 自我介绍 关于', run: function () { show('about'); } },
     { g: '页面', ic: '📁', label: '项目', kw: 'projects 项目 作品 splayer ciyuan', run: function () { show('projects'); } },
-    { g: '页面', ic: '📝', label: '工作日志', kw: 'log 日志 blog worklog', run: function () { show('log'); } },
+    { g: '页面', ic: '📝', label: '工作日志', kw: 'log 日志 blog', run: function () { show('log'); openDrawer(); } },
     { g: '页面', ic: '📮', label: '联络', kw: 'contact 联络 邮箱 email', run: function () { show('contact'); } },
     { g: '动作', ic: '⧉', label: '复制邮箱 contact@ciallo.sale', kw: 'copy email 复制 邮箱', run: function () {
         copyText('contact@ciallo.sale', '邮箱已复制 ✓');
@@ -306,13 +539,16 @@
     { g: '动作', ic: '◑', label: '切换浅色 / 深色', kw: 'theme light dark 主题 切换', run: function () {
         var b = document.body;
         var next = b.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.classList.add('theming');
         b.dataset.theme = next;
+        var bg = getComputedStyle(b).getPropertyValue('--bg').trim();
+        if (metaTheme && bg) metaTheme.setAttribute('content', bg);
+        clearTimeout(themeTimer);
+        themeTimer = setTimeout(function () { document.documentElement.classList.remove('theming'); }, 400);
         toast(next === 'light' ? '已切换到纸白主题' : '已切换到深色主题');
       } },
-    { g: '彩蛋', ic: '🦆', label: 'quack', kw: 'duck quack 鸭 嘎', run: function () { toast('（๑´ㅂ`๑) quack～'); } },
-    { g: '彩蛋', ic: '⏻', label: '关机（假装的）', kw: 'shutdown 关机', run: function () {
-        toast('这台指挥台没有电源键。');
-      } }
+    { g: '彩蛋', ic: '⭐', label: 'Ciallo～', kw: 'ciallo 彩蛋 颜文字', run: function () { openCiallo(); } },
+    { g: '彩蛋', ic: '🦆', label: 'quack', kw: 'duck quack 鸭 嘎', run: function () { toast('（๑´ㅂ`๑) quack～'); } }
   ];
 
   /* ---------- 面板 ---------- */
@@ -320,6 +556,7 @@
   var list = document.getElementById('list');
   var input = document.getElementById('q');
   var open = false, sel = 0, filtered = [];
+  var paletteTimer = null;
 
   function render(q) {
     q = (q || '').trim().toLowerCase();
@@ -346,7 +583,8 @@
         var at = c.label.toLowerCase().indexOf(q);
         if (at >= 0) label = esc(c.label.slice(0, at)) + '<mark>' + esc(c.label.slice(at, at + q.length)) + '</mark>' + esc(c.label.slice(at + q.length));
       }
-      html += '<div class="cmd' + (i === sel ? ' sel' : '') + '" data-i="' + i + '">' +
+      var cin = Math.min(i * 12, 144);
+      html += '<div class="cmd' + (i === sel ? ' sel' : '') + '" data-i="' + i + '" style="--cin:' + cin + 'ms">' +
               '<span class="ic">' + c.ic + '</span><span>' + label + '</span>' +
               '<span class="kbdhint"><kbd>↵</kbd></span></div>';
     });
@@ -373,15 +611,24 @@
   function openPalette() {
     if (open) return;
     open = true; sel = 0;
+    clearTimeout(paletteTimer);
+    overlay.hidden = false;
+    overlay.classList.remove('closing');
     input.value = '';
     render('');
     overlay.classList.add('on');
     setTimeout(function () { input.focus(); }, 0);
   }
   function closePalette() {
+    if (!open) return;
     open = false;
-    overlay.classList.remove('on');
     input.blur();
+    overlay.classList.add('closing');
+    clearTimeout(paletteTimer);
+    paletteTimer = setTimeout(function () {
+      overlay.classList.remove('on', 'closing');
+      overlay.hidden = true;
+    }, reduced ? 0 : 160);
   }
   input.addEventListener('input', function () { sel = 0; render(input.value); });
   overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) closePalette(); });
@@ -395,13 +642,18 @@
   /* 键盘：全局拦截 */
   var MODIFIERS = { Shift: 1, Control: 1, Alt: 1, Meta: 1, CapsLock: 1, Tab: 1, Escape: 1 };
   document.addEventListener('keydown', function (e) {
+    if (worklogOpen) return;
+    if (cialloOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); closeCiallo(); }
+      return;
+    }
     if (!open) {
       if (e.key === 'Escape') return;
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault(); openPalette(); return;
       }
       if (MODIFIERS[e.key] || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+      if (e.target && /INPUT|TEXTAREA|BUTTON/.test(e.target.tagName)) return;
       /* 任意键唤起；字母键顺带作为快捷过滤 */
       e.preventDefault();
       openPalette();
@@ -414,6 +666,143 @@
     else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
     else if (e.key === 'Enter') { e.preventDefault(); exec(sel); }
   });
+
+  /* ---------- worklog 全屏浮层：跳出框架 ---------- */
+  var worklog = document.getElementById('worklog');
+  var veil = document.getElementById('veil');
+  var dframe = document.getElementById('dframe');
+  var skeleton = document.getElementById('dskeleton');
+  var wlClose = document.getElementById('dclose');
+  var worklogOpen = false, frameRequested = false, frameReady = false, worklogTimer = null;
+
+  function getFrameDoc() {
+    try { return dframe.contentDocument || null; } catch (err) { return null; }
+  }
+  function frameIsWorklog() {
+    try { return dframe.contentWindow.location.href.indexOf('worklog.html') !== -1; }
+    catch (err) { return false; } /* 跨源读不到 location，按「不在 worklog」处理 */
+  }
+  /* iframe 每次导航都重跑：隐藏旧顶栏 + 捕获阶段拦截站内跳转（均幂等） */
+  function guardFrameDoc(doc) {
+    if (!doc) return;
+    if (!doc.getElementById('wl-embed-style')) {
+      var st = doc.createElement('style');
+      st.id = 'wl-embed-style';
+      st.textContent = 'header.topbar { display: none !important; }';
+      (doc.head || doc.documentElement).appendChild(st);
+    }
+    if (doc.__wlGuard) return;
+    doc.__wlGuard = true;
+    doc.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href');
+      if (!href || href.charAt(0) === '#') return; /* 站内锚点放行 */
+      var url;
+      try { url = new URL(href, doc.baseURI); } catch (err) { return; }
+      if (url.origin !== location.origin) return; /* 外链放行 */
+      if (url.pathname.slice(-12) === 'worklog.html') return; /* 本页链接放行 */
+      e.preventDefault();
+      closeDrawer(); /* 浮层退场回指挥台，绝不把整站嵌进来 */
+    }, true);
+  }
+  function resetFrame() {
+    frameReady = false;
+    dframe.classList.remove('ready');
+    worklog.classList.remove('loaded');
+    skeleton.hidden = false;
+    skeleton.classList.remove('gone');
+    dframe.src = 'worklog.html';
+  }
+  function onFrameLoad() {
+    if (!frameRequested) return;
+    var doc = getFrameDoc(), onWorklog = frameIsWorklog();
+    if (doc && !onWorklog) { resetFrame(); return; } /* 保险层：404/站内导航不嵌套 */
+    guardFrameDoc(doc);
+    if (frameReady) return; /* 骨架收起只走首次；每次 load 只做防护 */
+    frameReady = true;
+    dframe.classList.add('ready');
+    worklog.classList.add('loaded');
+    skeleton.classList.add('gone');
+    setTimeout(function () {
+      if (frameReady) skeleton.hidden = true;
+    }, reduced ? 0 : 320);
+  }
+  dframe.addEventListener('load', onFrameLoad);
+  function openDrawer() {
+    if (worklogOpen) return;
+    if (open) closePalette();
+    /* 保险层：关着时 iframe 被带去别处（含跨源），重开前拉回 worklog */
+    if (frameRequested && !frameIsWorklog()) resetFrame();
+    worklogOpen = true;
+    clearTimeout(worklogTimer);
+    worklog.hidden = false; veil.hidden = false;
+    worklog.setAttribute('aria-hidden', 'false');
+    if (!frameRequested) {
+      frameRequested = true;
+      skeleton.hidden = false;
+      dframe.src = 'worklog.html';
+    }
+    if (frameReady) {
+      skeleton.hidden = true;
+      dframe.classList.add('ready');
+      worklog.classList.add('loaded');
+    } else {
+      skeleton.hidden = false;
+      skeleton.classList.remove('gone');
+      dframe.classList.remove('ready');
+      worklog.classList.remove('loaded');
+    }
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      document.documentElement.classList.add('wlopen');
+      veil.classList.add('on');
+    }); });
+    setTimeout(function () { if (worklogOpen) wlClose.focus(); }, reduced ? 0 : 560);
+  }
+  function closeDrawer() {
+    if (!worklogOpen) return;
+    worklogOpen = false;
+    document.documentElement.classList.remove('wlopen');
+    veil.classList.remove('on');
+    if (worklog.contains(document.activeElement)) document.activeElement.blur();
+    worklog.setAttribute('aria-hidden', 'true');
+    clearTimeout(worklogTimer);
+    worklogTimer = setTimeout(function () {
+      worklog.hidden = true; veil.hidden = true;
+    }, reduced ? 0 : 380);
+  }
+  wlClose.addEventListener('click', closeDrawer);
+  veil.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && worklogOpen && !e.defaultPrevented) { e.preventDefault(); closeDrawer(); }
+  });
+
+  /* ---------- Ciallo 彩蛋浮层 ---------- */
+  var ciallo = document.getElementById('ciallo');
+  var cialloOpen = false, cialloTimer = null;
+
+  function openCiallo() {
+    if (cialloOpen) return;
+    if (open) closePalette(); /* 面板让位，只留最上层 */
+    if (worklogOpen) closeDrawer();
+    cialloOpen = true;
+    clearTimeout(cialloTimer);
+    ciallo.hidden = false;
+    ciallo.setAttribute('aria-hidden', 'false');
+    /* 等 hidden 撤销生效再加 .on，否则过渡不会跑 */
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      if (cialloOpen) ciallo.classList.add('on');
+    }); });
+  }
+  function closeCiallo() {
+    if (!cialloOpen) return;
+    cialloOpen = false;
+    ciallo.classList.remove('on');
+    ciallo.setAttribute('aria-hidden', 'true');
+    clearTimeout(cialloTimer);
+    cialloTimer = setTimeout(function () { ciallo.hidden = true; }, reduced ? 0 : 220);
+  }
+  ciallo.addEventListener('click', closeCiallo);
 
   /* ---------- toast / clipboard / 时钟 ---------- */
   var toastEl = document.getElementById('toast');
