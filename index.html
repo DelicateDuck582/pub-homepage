@@ -678,8 +678,13 @@
   function getFrameDoc() {
     try { return dframe.contentDocument || null; } catch (err) { return null; }
   }
+  /* Pages 会把 /worklog.html 308 到 /worklog，两种形态都算工作日志页 */
+  function isWorklogPath(pathname) {
+    var p = String(pathname || '').replace(/\/+$/, '');
+    return /\/worklog(\.html)?$/.test(p);
+  }
   function frameIsWorklog() {
-    try { return dframe.contentWindow.location.href.indexOf('worklog.html') !== -1; }
+    try { return isWorklogPath(dframe.contentWindow.location.pathname); }
     catch (err) { return false; } /* 跨源读不到 location，按「不在 worklog」处理 */
   }
   /* iframe 每次导航都重跑：隐藏旧顶栏 + 捕获阶段拦截站内跳转（均幂等） */
@@ -701,7 +706,7 @@
       var url;
       try { url = new URL(href, doc.baseURI); } catch (err) { return; }
       if (url.origin !== location.origin) return; /* 外链放行 */
-      if (url.pathname.slice(-12) === 'worklog.html') return; /* 本页链接放行 */
+      if (isWorklogPath(url.pathname)) return; /* 本页链接放行 */
       e.preventDefault();
       closeDrawer(); /* 浮层退场回指挥台，绝不把整站嵌进来 */
     }, true);
